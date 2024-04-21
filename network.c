@@ -198,6 +198,11 @@ int *tcp_listener(const char *s)
 	if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
 	    continue;		/* ignore */
 	opt = 1;
+	if (ai->ai_family == AF_INET6) {
+	    /* we are going to bind to IPv6 address only */
+	    if (setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt)) < 0)
+	        err_sys("setsockopt(IPPROTO_IPV6, IPV6_V6ONLY)");
+	}
 	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
 	    err_sys("setsockopt(SOL_SOCKET, SO_REUSEADDR)");
 	if (bind(fd, (struct sockaddr *) ai->ai_addr, ai->ai_addrlen) < 0)
