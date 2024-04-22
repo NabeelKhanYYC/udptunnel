@@ -7,7 +7,7 @@ endif ()
 
 set (CMAKE_PROJECT_DESCRIPTION "UDP tunnel over TCP")
 set (CMAKE_PROJECT_HOMEPAGE_URL "https://github.com/andrew-aladjev/udptunnel")
-set (PROJECT_VERSION "1.2.0")
+set (PROJECT_VERSION "1.2.1")
 
 if (NOT DEFINED CMAKE_INSTALL_BINDIR)
   set (CMAKE_INSTALL_BINDIR "sbin" CACHE PATH "output directory for binaries")
