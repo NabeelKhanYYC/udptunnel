@@ -1,0 +1,51 @@
+x-build-configuration: &build-configuration
+  build:
+    context: ./
+    dockerfile: ./docker/Dockerfile
+    target: build
+  restart: "no"
+  profiles:
+    - build
+  volumes:
+    - ./src:/opt/build/src:ro
+    - ./build:/opt/build/build:rw
+  working_dir: /opt/build/src
+
+services:
+  build:
+    <<: *build-configuration
+    command: make
+  clean:
+    <<: *build-configuration
+    command: make clean
+  all:
+    <<: *build-configuration
+    command: sh -c "make clean && make"
+  debug:
+    <<: *build-configuration
+    environment:
+      - CFLAGS=-g -O0 -DDEBUG
+    command: make
+  
+  udptunnel:
+    build:
+      context: ./
+      dockerfile: ./docker/Dockerfile
+      target: compose
+    restart: "no"
+    ports:
+      - ${UDPTUNNEL_SOURCE_PORT:-65535}:${UDPTUNNEL_SOURCE_PORT:-65535}
+    environment:
+      - UDPTUNNEL_MODE=${UDPTUNNEL_MODE:-}
+      - UDPTUNNEL_SOURCE_HOST=${UDPTUNNEL_SOURCE_HOST:-}
+      - UDPTUNNEL_SOURCE_PORT=${UDPTUNNEL_SOURCE_PORT:-}
+      - UDPTUNNEL_DESTINATION_HOST=${UDPTUNNEL_DESTINATION_HOST:-}
+      - UDPTUNNEL_DESTINATION_PORT=${UDPTUNNEL_DESTINATION_PORT:-}
+      - UDPTUNNEL_TIMEOUT=${UDPTUNNEL_TIMEOUT:-}
+      - UDPTUNNEL_VERBOSE=${UDPTUNNEL_VERBOSE:-}
+    networks:
+      - udptunnel
+networks:
+  udptunnel:
+    external: false
+    

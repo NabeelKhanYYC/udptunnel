@@ -26,7 +26,7 @@
 #include <syslog.h>
 
 #include "log.h"
-#include "utils.h"
+#include "../utils/utils.h"
 
 static log_level filter_level = log_info;
 

@@ -32,8 +32,8 @@
 #include <ctype.h>
 
 #include "network.h"
-#include "utils.h"
-#include "log.h"
+#include "../utils/utils.h"
+#include "../log/log.h"
 
 char *print_addr_port(const struct sockaddr *addr, socklen_t addrlen)
 {

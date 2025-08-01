@@ -23,7 +23,7 @@
 
 #include <stdarg.h>
 
-#include "utils.h"
+#include "../utils/utils.h"
 
 typedef enum log_level {
     /* the value of the first 3 bits matches the syslog(3) levels */

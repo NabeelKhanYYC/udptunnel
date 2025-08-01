@@ -68,9 +68,9 @@
 #include <systemd/sd-daemon.h>
 #endif
 
-#include "utils.h"
-#include "log.h"
-#include "network.h"
+#include "libs/utils/utils.h"
+#include "libs/log/log.h"
+#include "libs/network/network.h"
 
 #ifdef HAVE_GETOPT_LONG
 #include <getopt.h>

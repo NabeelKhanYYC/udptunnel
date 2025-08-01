@@ -1,0 +1,189 @@
+#!/bin/bash
+
+set -euo pipefail
+
+# Function to log messages
+log() {
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >&2
+}
+
+# Function to log errors and exit
+log_error() {
+    log "ERROR: $*"
+    exit 1
+}
+
+# Function to validate required environment variables
+validate_env() {
+    local has_errors=false
+    
+    if [ -z "${UDPTUNNEL_MODE:-}" ]; then
+        log "    UDPTUNNEL_MODE is required. Set to 'server' or 'client'"
+        has_errors=true
+    elif [[ ! "${UDPTUNNEL_MODE}" =~ ^(server|client)$ ]]; then
+        log "    UDPTUNNEL_MODE must be 'server' or 'client', got: ${UDPTUNNEL_MODE}"
+        has_errors=true
+    fi
+    
+    if [ -z "${UDPTUNNEL_DESTINATION_HOST:-}" ]; then
+        log "    UDPTUNNEL_DESTINATION_HOST is required"
+        has_errors=true
+    fi
+    
+    if [ -z "${UDPTUNNEL_DESTINATION_PORT:-}" ]; then
+        log "    UDPTUNNEL_DESTINATION_PORT is required"
+        has_errors=true
+    elif [[ ! "${UDPTUNNEL_DESTINATION_PORT}" =~ ^[0-9]+$ ]] || [ "${UDPTUNNEL_DESTINATION_PORT}" -lt 1 ] || [ "${UDPTUNNEL_DESTINATION_PORT}" -gt 65535 ]; then
+        log "    UDPTUNNEL_DESTINATION_PORT must be a valid port number (1-65535), got: ${UDPTUNNEL_DESTINATION_PORT}"
+        has_errors=true
+    fi
+    
+    # Validate source port - required for server mode
+    if [ "${UDPTUNNEL_MODE}" = "server" ]; then
+        if [ -z "${UDPTUNNEL_SOURCE_PORT:-}" ]; then
+            log "    UDPTUNNEL_SOURCE_PORT is required for server mode"
+            has_errors=true
+        elif [[ ! "${UDPTUNNEL_SOURCE_PORT}" =~ ^[0-9]+$ ]] || [ "${UDPTUNNEL_SOURCE_PORT}" -lt 1 ] || [ "${UDPTUNNEL_SOURCE_PORT}" -gt 65535 ]; then
+            log "    UDPTUNNEL_SOURCE_PORT must be a valid port number (1-65535), got: ${UDPTUNNEL_SOURCE_PORT}"
+            has_errors=true
+        fi
+    elif [ -n "${UDPTUNNEL_SOURCE_PORT:-}" ]; then
+        if [[ ! "${UDPTUNNEL_SOURCE_PORT}" =~ ^[0-9]+$ ]] || [ "${UDPTUNNEL_SOURCE_PORT}" -lt 1 ] || [ "${UDPTUNNEL_SOURCE_PORT}" -gt 65535 ]; then
+            log "    UDPTUNNEL_SOURCE_PORT must be a valid port number (1-65535), got: ${UDPTUNNEL_SOURCE_PORT}"
+            has_errors=true
+        fi
+    fi
+    
+    if [ "$has_errors" = true ]; then
+        log
+        log "FATAL ERROR: Invalid configuration, please see .env.example for configuration examples"
+        exit 1
+    fi
+    
+    log "Mode: ${UDPTUNNEL_MODE}"
+}
+
+# Function to build command line arguments
+build_args() {
+    local args=()
+    
+    # Add mode-specific flags
+    if [ "${UDPTUNNEL_MODE}" = "server" ]; then
+        args+=("-s")
+    fi
+    
+    # Add timeout if specified
+    if [ -n "${UDPTUNNEL_TIMEOUT:-}" ]; then
+        if [[ ! "${UDPTUNNEL_TIMEOUT}" =~ ^[0-9]+$ ]]; then
+            log_error "UDPTUNNEL_TIMEOUT must be a positive integer, got: ${UDPTUNNEL_TIMEOUT}"
+        fi
+        args+=("-T" "${UDPTUNNEL_TIMEOUT}")
+    fi
+    
+    # Add verbosity if specified
+    if [ -n "${UDPTUNNEL_VERBOSE:-}" ]; then
+        case "${UDPTUNNEL_VERBOSE}" in
+            0) ;;  # No verbose flag
+            1) args+=("-v") ;;
+            2) args+=("-v" "-v") ;;
+            3) args+=("-v" "-v" "-v") ;;
+            *) log_error "UDPTUNNEL_VERBOSE must be 0-3, got: ${UDPTUNNEL_VERBOSE}" ;;
+        esac
+    fi
+    
+    # Build source and destination arguments based on mode
+    if [ "${UDPTUNNEL_MODE}" = "server" ]; then
+        # Server mode: udptunnel -s SOURCE:PORT DESTINATION:PORT
+        # Source is required for server mode
+        if [ -n "${UDPTUNNEL_SOURCE_HOST:-}" ]; then
+            args+=("${UDPTUNNEL_SOURCE_HOST}:${UDPTUNNEL_SOURCE_PORT}")
+        else
+            args+=("${UDPTUNNEL_SOURCE_PORT}")
+        fi
+        args+=("${UDPTUNNEL_DESTINATION_HOST}:${UDPTUNNEL_DESTINATION_PORT}")
+    else
+        # Client mode: udptunnel [SOURCE:PORT] DESTINATION:PORT
+        # Source is optional for client mode
+        if [ -n "${UDPTUNNEL_SOURCE_HOST:-}" ] && [ -n "${UDPTUNNEL_SOURCE_PORT:-}" ]; then
+            args+=("${UDPTUNNEL_SOURCE_HOST}:${UDPTUNNEL_SOURCE_PORT}")
+        elif [ -n "${UDPTUNNEL_SOURCE_PORT:-}" ]; then
+            args+=("${UDPTUNNEL_SOURCE_PORT}")
+        fi
+        args+=("${UDPTUNNEL_DESTINATION_HOST}:${UDPTUNNEL_DESTINATION_PORT}")
+    fi
+    
+    echo "${args[@]}"
+}
+
+# Function to display configuration summary  
+show_config() {
+    log "Starting UDP Tunnel with configuration:"
+    log "  Mode: ${UDPTUNNEL_MODE}"
+    
+    if [ "${UDPTUNNEL_MODE}" = "server" ]; then
+        # Server mode always needs a source address
+        if [ -n "${UDPTUNNEL_SOURCE_HOST:-}" ]; then
+            log "  Source Address: ${UDPTUNNEL_SOURCE_HOST}:${UDPTUNNEL_SOURCE_PORT}"
+        else
+            log "  Source Address: ${UDPTUNNEL_SOURCE_PORT}"
+        fi
+    else
+        # Client mode - source is optional
+        if [ -n "${UDPTUNNEL_SOURCE_HOST:-}" ] && [ -n "${UDPTUNNEL_SOURCE_PORT:-}" ]; then
+            log "  Source Address: ${UDPTUNNEL_SOURCE_HOST}:${UDPTUNNEL_SOURCE_PORT}"
+        elif [ -n "${UDPTUNNEL_SOURCE_PORT:-}" ]; then
+            log "  Source Address: ${UDPTUNNEL_SOURCE_PORT}"
+        else
+            log "  Source Address: <not specified>"
+        fi
+    fi
+    
+    log "  Destination Address: ${UDPTUNNEL_DESTINATION_HOST}:${UDPTUNNEL_DESTINATION_PORT}"
+    log "  Timeout: ${UDPTUNNEL_TIMEOUT:-<not specified>}"
+    log "  Verbose Level: ${UDPTUNNEL_VERBOSE:-0}"
+}
+
+# Signal handler for graceful shutdown
+cleanup() {
+    log "Received shutdown signal, stopping udptunnel..."
+    if [ -n "${UDPTUNNEL_PID:-}" ]; then
+        kill -TERM "${UDPTUNNEL_PID}" 2>/dev/null || true
+        wait "${UDPTUNNEL_PID}" 2>/dev/null || true
+    fi
+    log "Shutdown complete"
+    exit 0
+}
+
+# Set up signal handlers
+trap cleanup SIGTERM SIGINT SIGQUIT
+
+# Main execution
+main() {
+    log "UDP Tunnel Container starting..."
+    
+    # Validate environment
+    validate_env
+    
+    # Show configuration
+    show_config
+    
+    # Build command arguments
+    local cmd_args
+    cmd_args=$(build_args)
+    
+    log "Executing: udptunnel ${cmd_args}"
+    
+    # Execute udptunnel in background to handle signals properly
+    udptunnel ${cmd_args} &
+    UDPTUNNEL_PID=$!
+    
+    # Wait for the process to complete
+    wait "${UDPTUNNEL_PID}"
+    local exit_code=$?
+    
+    log "UDP Tunnel exited with code: ${exit_code}"
+    exit ${exit_code}
+}
+
+# Run main function
+main "$@"
