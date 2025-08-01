@@ -7,23 +7,24 @@
 set -e
 
 TARGET=${1:-build}
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 case $TARGET in
     build)
         echo "Running normal build..."
-        cd ../ && docker compose --profile build up build
+        cd "$SCRIPT_DIR/../" && docker compose --profile build up build
         ;;
     clean)
         echo "Running clean..."
-        cd ../ && docker compose --profile build up clean
+        cd "$SCRIPT_DIR/../" && docker compose --profile build up clean
         ;;
     all)
         echo "Running clean then build..."
-        cd ../ && docker compose --profile build up all
+        cd "$SCRIPT_DIR/../" && docker compose --profile build up all
         ;;
     debug)
         echo "Running debug build..."
-        cd ../ && docker compose --profile build up debug
+        cd "$SCRIPT_DIR/../" && docker compose --profile build up debug
         ;;
     *)
         echo "Usage: $0 [build|clean|all|debug]"
