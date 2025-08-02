@@ -73,9 +73,9 @@ char *print_addr_port(const struct sockaddr *addr, socklen_t addrlen)
      */
     err = getnameinfo(addr, addrlen, address, sizeof(address), port, sizeof(port), NI_NUMERICHOST | NI_NUMERICSERV);
     if (err == EAI_SYSTEM)
-		err_sys("getnameinfo");			// System error (errno set)
+		  err_sys("getnameinfo");			// System error (errno set)
     else if (err)
-		log_printf_exit(1, log_err, "getnameinfo: %s", gai_strerror(err));	// GAI error
+		  log_printf_exit(1, log_err, "getnameinfo: %s", gai_strerror(err));	// GAI error
 
     /*
      * Format according to standard conventions:
@@ -83,9 +83,9 @@ char *print_addr_port(const struct sockaddr *addr, socklen_t addrlen)
      * IPv4: address:port (no brackets needed)
      */
     if (addr->sa_family == AF_INET6)
-		snprintf(buf, sizeof(buf) - 1, "[%s]:%s", address, port);
+		  snprintf(buf, sizeof(buf) - 1, "[%s]:%s", address, port);
     else
-		snprintf(buf, sizeof(buf) - 1, "%s:%s", address, port);
+		  snprintf(buf, sizeof(buf) - 1, "%s:%s", address, port);
 
     return buf;							// Return pointer to static buffer - caller must not free
 }
@@ -121,66 +121,66 @@ static char *ai_print_addr_port(struct addrinfo *ai)
  */
 static void parse_address_port(const char *input, char **address, char **port)
 {
-    const char *p;
+  const char *p;
 
-    *address = NULL;
-    *port = NULL;
+  *address = NULL;
+  *port = NULL;
 
-    /*
-     * Parse different address formats:
-     * Empty string: return both address and port as NULL
-     * IPv6 bracketed format: [address]:port or [address]
-     * IPv6 unbracketed: address (multiple colons, no port)
-     * IPv4 with port: address:port
-     * Port only: numeric string
-     * Address only: non-numeric string
-     */
-    if (*input == '\0') {
-		return;
-    } else if (*input == '[' && (p = strchr(input, ']'))) {	/* IPv6 bracketed format */
-		char *s;
-		int len = p - input - 1;		// Length of address between brackets
+  /*
+    * Parse different address formats:
+    * Empty string: return both address and port as NULL
+    * IPv6 bracketed format: [address]:port or [address]
+    * IPv6 unbracketed: address (multiple colons, no port)
+    * IPv4 with port: address:port
+    * Port only: numeric string
+    * Address only: non-numeric string
+    */
+  if (*input == '\0') {
+    return;
+  } else if (*input == '[' && (p = strchr(input, ']'))) {	/* IPv6 bracketed format */
+    char *s;
+    int len = p - input - 1;		// Length of address between brackets
 
-		/* Extract IPv6 address from between [ and ] */
-		*address = s = NOFAIL(malloc(len + 1));
-		memcpy(s, input + 1, len);			// Copy address part, skip opening [
-		*(s + len) = '\0';			    	// Null terminate
+    /* Extract IPv6 address from between [ and ] */
+    *address = s = NOFAIL(malloc(len + 1));
+    memcpy(s, input + 1, len);			// Copy address part, skip opening [
+    *(s + len) = '\0';			    	// Null terminate
 
-		/* Look for optional port after the closing ] */
-		p = strchr(p, ':');					// Find : after ]
-		if (p && *(p + 1) != '\0')			// If : exists and has content after it
-			*port = NOFAIL(strdup(p + 1));	// Extract port
-	} else if ((p = strchr(input, ':')) &&	/* IPv6 without brackets */
-		strchr(p + 1, ':')) {				/* Multiple colons = IPv6 address */
+    /* Look for optional port after the closing ] */
+    p = strchr(p, ':');					// Find : after ]
+    if (p && *(p + 1) != '\0')			// If : exists and has content after it
+      *port = NOFAIL(strdup(p + 1));	// Extract port
+  } else if ((p = strchr(input, ':')) &&	/* IPv6 without brackets */
+    strchr(p + 1, ':')) {				/* Multiple colons = IPv6 address */
 
-		/* Unbracketed IPv6 address (no port possible due to ambiguity) */
-		*address = NOFAIL(strdup(input));
-	} else if ((p = strchr(input, ':'))) {		/* IPv4 + port or hostname + port */
-		char *s;
-		int len = p - input;			// Length of address part before :
+    /* Unbracketed IPv6 address (no port possible due to ambiguity) */
+    *address = NOFAIL(strdup(input));
+  } else if ((p = strchr(input, ':'))) {		/* IPv4 + port or hostname + port */
+    char *s;
+    int len = p - input;			// Length of address part before :
 
-		/* Extract address part (everything before first :) */
-		if (len) {						/* Only allocate if there's an address part */
-			*address = s = NOFAIL(malloc(len + 1));
-			memcpy(s, input, len);
-			*(s + len) = '\0';
-		}
-
-		/* Extract port part (everything after first :) */
-		p++;							// Skip the :
-		if (*p != '\0')					// Only set port if there's content after :
-			*port = NOFAIL(strdup(p));
-	} else {
-		/* Ambiguous case: could be address-only or port-only */
-		/* Check if string is all digits -> port, otherwise -> address */
-		for (p = input; *p; p++)
-			if (!isdigit(p[0]))	 // Non-digit found
-				break;
-		if (*p)									// Non-digit found -> this is an address
-			*address = NOFAIL(strdup(input));	// Address without port
-		else									// All digits -> this is a port number
-			*port = NOFAIL(strdup(input));		// Port without address
+    /* Extract address part (everything before first :) */
+    if (len) {						/* Only allocate if there's an address part */
+      *address = s = NOFAIL(malloc(len + 1));
+      memcpy(s, input, len);
+      *(s + len) = '\0';
     }
+
+    /* Extract port part (everything after first :) */
+    p++;							// Skip the :
+    if (*p != '\0')					// Only set port if there's content after :
+      *port = NOFAIL(strdup(p));
+  } else {
+    /* Ambiguous case: could be address-only or port-only */
+    /* Check if string is all digits -> port, otherwise -> address */
+    for (p = input; *p; p++)
+      if (!isdigit(p[0]))	 // Non-digit found
+        break;
+    if (*p)									// Non-digit found -> this is an address
+      *address = NOFAIL(strdup(input));	// Address without port
+    else									// All digits -> this is a port number
+      *port = NOFAIL(strdup(input));		// Port without address
+  }
 }
 
 /**
@@ -196,64 +196,64 @@ static void parse_address_port(const char *input, char **address, char **port)
  */
 int udp_listener(const char *s)
 {
-    char *address, *port;
-    struct addrinfo hints, *res, *ai;
-    int err, fd;
+  char *address, *port;
+  struct addrinfo hints, *res, *ai;
+  int err, fd;
 
-    parse_address_port(s, &address, &port);
+  parse_address_port(s, &address, &port);
 
-    if (!port)
-		log_printf_exit(2, log_err, "Missing port in '%s'!", s);
+  if (!port)
+    log_printf_exit(2, log_err, "Missing port in '%s'!", s);
 
-    /*
-     * Set up address resolution hints:
-     * AF_UNSPEC: Accept both IPv4 and IPv6 addresses
-     * SOCK_DGRAM: UDP socket type
-     * AI_PASSIVE: Address will be used for bind() (listening)
-     * AI_ADDRCONFIG: Only return addresses for which we have network interfaces
-     * AI_IDN: Support Internationalized Domain Names
-     */
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_DGRAM;
-    hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE | AI_IDN;
+   /*
+    * Set up address resolution hints:
+    * AF_UNSPEC: Accept both IPv4 and IPv6 addresses
+    * SOCK_DGRAM: UDP socket type
+    * AI_PASSIVE: Address will be used for bind() (listening)
+    * AI_ADDRCONFIG: Only return addresses for which we have network interfaces
+    * AI_IDN: Support Internationalized Domain Names
+    */
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_DGRAM;
+  hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE | AI_IDN;
 
-    err = getaddrinfo(address, port, &hints, &res);
-    if (err == EAI_SYSTEM)
-		err_sys("getaddrinfo(%s:%s)", address, port);
-    else if (err)
-		log_printf_exit(1, log_err, "Cannot resolve %s:%s: %s", address, port, gai_strerror(err));
+  err = getaddrinfo(address, port, &hints, &res);
+  if (err == EAI_SYSTEM)
+    err_sys("getaddrinfo(%s:%s)", address, port);
+  else if (err)
+    log_printf_exit(1, log_err, "Cannot resolve %s:%s: %s", address, port, gai_strerror(err));
 
-    /*
-     * Clean up dynamically allocated memory from parse_address_port().
-     * These strings were allocated with malloc/strdup and must be freed.
-     */
-    if (address)
-		free(address);
-    if (port)
-		free(port);
+   /*
+    * Clean up dynamically allocated memory from parse_address_port().
+    * These strings were allocated with malloc/strdup and must be freed.
+    */
+  if (address)
+    free(address);
+  if (port)
+    free(port);
 
-    /*
-     * Try to bind to the first available address. Unlike tcp_listener(),
-     * this only creates one socket since UDP is connectionless and doesn't
-     * need to listen on multiple address families simultaneously.
-     */
-    for (ai = res; ai; ai = ai->ai_next) {
-		if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
-			continue;				// ignore socket creation failure, try next address
-		if (bind(fd, (struct sockaddr *) ai->ai_addr, ai->ai_addrlen) == 0)
-			break;					// success - bound to address
-		close(fd);					// bind failed, clean up and try next
-    }
+   /*
+    * Try to bind to the first available address. Unlike tcp_listener(),
+    * this only creates one socket since UDP is connectionless and doesn't
+    * need to listen on multiple address families simultaneously.
+    */
+  for (ai = res; ai; ai = ai->ai_next) {
+    if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
+      continue;				// ignore socket creation failure, try next address
+    if (bind(fd, (struct sockaddr *) ai->ai_addr, ai->ai_addrlen) == 0)
+      break;					// success - bound to address
+    close(fd);					// bind failed, clean up and try next
+  }
 
-    if (!ai)
-		err_sys("Cannot bind to %s", s);
+  if (!ai)
+    err_sys("Cannot bind to %s", s);
 
-    log_printf(log_info, "Listening for UDP connections on %s", ai_print_addr_port(ai));
+  log_printf(log_info, "Listening for UDP connections on %s", ai_print_addr_port(ai));
 
-    freeaddrinfo(res);
+  freeaddrinfo(res);
 
-    return fd;
+  return fd;
 }
 
 /**
@@ -271,110 +271,110 @@ int udp_listener(const char *s)
  */
 int *tcp_listener(const char *s)
 {
-    char *address, *port;
-    struct addrinfo hints, *res, *ai;
-    int err, fd, opt;
-    int fd_num = 0;
-    int *fd_list = NULL;
-    size_t allocated_fds = 0;
+  char *address, *port;
+  struct addrinfo hints, *res, *ai;
+  int err, fd, opt;
+  int fd_num = 0;
+  int *fd_list = NULL;
+  size_t allocated_fds = 0;
 
-    parse_address_port(s, &address, &port);
+  parse_address_port(s, &address, &port);
 
-    if (!port)
-		log_printf_exit(2, log_err, "Missing port in '%s'!", s);
+  if (!port)
+    log_printf_exit(2, log_err, "Missing port in '%s'!", s);
 
+   /*
+    * Set up address resolution hints for TCP listening:
+    * AF_UNSPEC: Accept both IPv4 and IPv6 addresses
+    * SOCK_STREAM: TCP socket type
+    * AI_PASSIVE: Address will be used for bind() (listening)
+    * AI_ADDRCONFIG: Only return addresses for which we have network interfaces
+    * AI_IDN: Support Internationalized Domain Names
+    */
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE | AI_IDN;
+
+  err = getaddrinfo(address, port, &hints, &res);
+  if (err == EAI_SYSTEM)
+    err_sys("getaddrinfo(%s:%s)", address, port);
+  else if (err)
+    log_printf_exit(1, log_err, "Cannot resolve %s:%s: %s", address, port, gai_strerror(err));
+
+   /*
+    * Clean up dynamically allocated memory from parse_address_port().
+    * These strings were allocated with malloc/strdup and must be freed.
+    */
+  if (address)
+    free(address);
+  if (port)
+    free(port);
+
+   /*
+    * Create listening sockets for ALL resolved addresses (IPv4 and IPv6).
+    * This enables dual-stack operation where the server can accept connections
+    * on both address families simultaneously. Each successful socket is added
+    * to the dynamically growing fd_list array.
+    */
+  for (ai = res; ai; ai = ai->ai_next) {
+    if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
+        continue;		// ignore socket creation failure, try next address
     /*
-     * Set up address resolution hints for TCP listening:
-     * AF_UNSPEC: Accept both IPv4 and IPv6 addresses
-     * SOCK_STREAM: TCP socket type
-     * AI_PASSIVE: Address will be used for bind() (listening)
-     * AI_ADDRCONFIG: Only return addresses for which we have network interfaces
-     * AI_IDN: Support Internationalized Domain Names
-     */
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-    hints.ai_flags = AI_ADDRCONFIG | AI_PASSIVE | AI_IDN;
-
-    err = getaddrinfo(address, port, &hints, &res);
-    if (err == EAI_SYSTEM)
-		err_sys("getaddrinfo(%s:%s)", address, port);
-    else if (err)
-		log_printf_exit(1, log_err, "Cannot resolve %s:%s: %s", address, port, gai_strerror(err));
-
-    /*
-     * Clean up dynamically allocated memory from parse_address_port().
-     * These strings were allocated with malloc/strdup and must be freed.
-     */
-    if (address)
-		free(address);
-    if (port)
-		free(port);
-
-    /*
-     * Create listening sockets for ALL resolved addresses (IPv4 and IPv6).
-     * This enables dual-stack operation where the server can accept connections
-     * on both address families simultaneously. Each successful socket is added
-     * to the dynamically growing fd_list array.
-     */
-    for (ai = res; ai; ai = ai->ai_next) {
-	if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
-	    continue;		// ignore socket creation failure, try next address
-		/*
-		 * Enable SO_REUSEADDR to allow immediate reuse of the port after
-		 * server restart, avoiding "Address already in use" errors during
-		 * development and testing.
-		 */
-	opt = 1;
-	if (ai->ai_family == AF_INET6) {
-	    /* we are going to bind to IPv6 address only */
-	    if (setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt)) < 0)
-	        err_sys("setsockopt(IPPROTO_IPV6, IPV6_V6ONLY)");
-	}
-	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
-	    err_sys("setsockopt(SOL_SOCKET, SO_REUSEADDR)");
-	if (bind(fd, (struct sockaddr *) ai->ai_addr, ai->ai_addrlen) < 0)
-	    err_sys("Cannot bind to %s", s);
-
-		/* success */
-		if (listen(fd, 128) < 0)
-			err_sys("listen");
-
-		/*
-		 * Grow the fd_list array dynamically. We need space for:
-		 * - Current socket (fd_num)
-		 * - New socket (+1) 
-		 * - Array terminator -1 (+1)
-		 * Allocate in chunks of 8 to reduce realloc() calls.
-		 */
-		if (allocated_fds < fd_num + 1 + 1) {
-			allocated_fds += 8;
-			fd_list = realloc(fd_list, allocated_fds * sizeof(int));
-		}
-		fd_list[fd_num++] = fd;
-
-		log_printf(log_info, "Listening for TCP connections on %s", ai_print_addr_port(ai));
+    * Enable SO_REUSEADDR to allow immediate reuse of the port after
+    * server restart, avoiding "Address already in use" errors during
+    * development and testing.
+    */
+    opt = 1;
+    if (ai->ai_family == AF_INET6) {
+        /* we are going to bind to IPv6 address only */
+        if (setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt)) < 0)
+            err_sys("setsockopt(IPPROTO_IPV6, IPV6_V6ONLY)");
     }
+    if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+        err_sys("setsockopt(SOL_SOCKET, SO_REUSEADDR)");
+    if (bind(fd, (struct sockaddr *) ai->ai_addr, ai->ai_addrlen) < 0)
+        err_sys("Cannot bind to %s", s);
 
-    /*
-     * Terminate the file descriptor array with -1 sentinel value.
-     * This allows callers to iterate through the array without knowing
-     * the exact count. Ensure we have space for the terminator.
-     */
-    if (allocated_fds < fd_num + 1 + 1)
-		fd_list = realloc(fd_list, ++allocated_fds * sizeof(int));
-    fd_list[fd_num] = -1;				// Array terminator
+    /* success */
+    if (listen(fd, 128) < 0)
+      err_sys("listen");
 
-    /*
-     * Check for complete failure: no sockets were created successfully.
-     * This could happen if all addresses failed to resolve or bind.
-     */
-    if (!fd_list)
-		err_sys("socket");				// No listening sockets created
+   /*
+    * Grow the fd_list array dynamically. We need space for:
+    * - Current socket (fd_num)
+    * - New socket (+1) 
+    * - Array terminator -1 (+1)
+    * Allocate in chunks of 8 to reduce realloc() calls.
+    */
+    if (allocated_fds < fd_num + 1 + 1) {
+      allocated_fds += 8;
+      fd_list = realloc(fd_list, allocated_fds * sizeof(int));
+    }
+    fd_list[fd_num++] = fd;
 
-    freeaddrinfo(res);
+    log_printf(log_info, "Listening for TCP connections on %s", ai_print_addr_port(ai));
+  }
 
-    return fd_list;
+   /*
+    * Terminate the file descriptor array with -1 sentinel value.
+    * This allows callers to iterate through the array without knowing
+    * the exact count. Ensure we have space for the terminator.
+    */
+  if (allocated_fds < fd_num + 1 + 1)
+    fd_list = realloc(fd_list, ++allocated_fds * sizeof(int));
+  fd_list[fd_num] = -1;				// Array terminator
+
+   /*
+    * Check for complete failure: no sockets were created successfully.
+    * This could happen if all addresses failed to resolve or bind.
+    */
+  if (!fd_list)
+    err_sys("socket");				// No listening sockets created
+
+  freeaddrinfo(res);
+
+  return fd_list;
 }
 
 /**
@@ -396,98 +396,98 @@ int *tcp_listener(const char *s)
  */
 int accept_connections(int listening_sockets[])
 {
-    while (1) {
-		int max = 0;
-		int i, fd;
-		fd_set readfds;
-		pid_t pid;
+  while (1) {
+    int max = 0;
+    int i, fd;
+    fd_set readfds;
+    pid_t pid;
 
-		/*
-		 * Prepare for select() by setting up the file descriptor set.
-		 * Make all listening sockets non-blocking to prevent hanging
-		 * on accept() if another process steals the connection.
-		 */
-		FD_ZERO(&readfds);				// Clear the file descriptor set
-		for (i = 0; listening_sockets[i] != -1; i++) {
-			int flags;
+    /*
+    * Prepare for select() by setting up the file descriptor set.
+    * Make all listening sockets non-blocking to prevent hanging
+    * on accept() if another process steals the connection.
+    */
+    FD_ZERO(&readfds);				// Clear the file descriptor set
+    for (i = 0; listening_sockets[i] != -1; i++) {
+      int flags;
 
-			/* Set socket to non-blocking mode */
-			if ((flags = fcntl(listening_sockets[i], F_GETFL, 0)) < 0)
-				err_sys("fcntl(F_GETFL)");
-			if (fcntl(listening_sockets[i], F_SETFL, flags | O_NONBLOCK) < 0)
-				err_sys("fcntl(F_SETFL, O_NONBLOCK)");
+      /* Set socket to non-blocking mode */
+      if ((flags = fcntl(listening_sockets[i], F_GETFL, 0)) < 0)
+        err_sys("fcntl(F_GETFL)");
+      if (fcntl(listening_sockets[i], F_SETFL, flags | O_NONBLOCK) < 0)
+        err_sys("fcntl(F_SETFL, O_NONBLOCK)");
 
-			/* Add socket to the select() monitoring set */
-			FD_SET(listening_sockets[i], &readfds);
-			SET_MAX(listening_sockets[i]);		// Track highest fd number for select()
-		}
+      /* Add socket to the select() monitoring set */
+      FD_SET(listening_sockets[i], &readfds);
+      SET_MAX(listening_sockets[i]);		// Track highest fd number for select()
+    }
 
-		/*
-		 * Block until at least one listening socket has an incoming connection.
-		 * select() modifies readfds to indicate which sockets are ready.
-		 */
-		if (select(max, &readfds, NULL, NULL, NULL) < 0) {
-			if (errno == EINTR || errno == EAGAIN)
-				continue;			// Handle interrupted system calls gracefully
-			err_sys("select");
-		}
+    /*
+    * Block until at least one listening socket has an incoming connection.
+    * select() modifies readfds to indicate which sockets are ready.
+    */
+    if (select(max, &readfds, NULL, NULL, NULL) < 0) {
+      if (errno == EINTR || errno == EAGAIN)
+        continue;			// Handle interrupted system calls gracefully
+      err_sys("select");
+    }
 
-		/*
-		 * Check each listening socket that select() indicated is ready.
-		 * Accept the first available connection and fork to handle it.
-		 */
-		for (i = 0; listening_sockets[i] != -1; i++) {
-			int listen_sock;
-			struct sockaddr_storage client_addr;	// Storage for client address
-			socklen_t addrlen = sizeof(client_addr);
+    /*
+    * Check each listening socket that select() indicated is ready.
+    * Accept the first available connection and fork to handle it.
+    */
+    for (i = 0; listening_sockets[i] != -1; i++) {
+      int listen_sock;
+      struct sockaddr_storage client_addr;	// Storage for client address
+      socklen_t addrlen = sizeof(client_addr);
 
-			/* Skip sockets that aren't ready (not set by select) */
-			if (!FD_ISSET(listening_sockets[i], &readfds))
-				continue;
-			listen_sock = listening_sockets[i];
+      /* Skip sockets that aren't ready (not set by select) */
+      if (!FD_ISSET(listening_sockets[i], &readfds))
+        continue;
+      listen_sock = listening_sockets[i];
 
-			/* Accept the incoming connection */
-			fd = accept(listen_sock, (struct sockaddr *) &client_addr, &addrlen);
-			if (fd < 0) {
-				if (errno == EAGAIN)		// Would block (shouldn't happen after select)
-					continue;
-				err_sys("accept");
-			}
+      /* Accept the incoming connection */
+      fd = accept(listen_sock, (struct sockaddr *) &client_addr, &addrlen);
+      if (fd < 0) {
+        if (errno == EAGAIN)		// Would block (shouldn't happen after select)
+          continue;
+        err_sys("accept");
+      }
 
-			log_printf(log_notice, "Received a TCP connection from %s", print_addr_port((struct sockaddr *) &client_addr, addrlen));
+      log_printf(log_notice, "Received a TCP connection from %s", print_addr_port((struct sockaddr *) &client_addr, addrlen));
 
 #if 0
-			/*
-			 * Testing mode: handle connections in the same process.
-			 * This simplifies debugging but prevents concurrent connections.
-			 */
-			pid = 0;
+      /*
+      * Testing mode: handle connections in the same process.
+      * This simplifies debugging but prevents concurrent connections.
+      */
+      pid = 0;
 #else
-			/*
-			 * Production mode: fork a child process for each connection.
-			 * This provides isolation between tunnel sessions and allows
-			 * concurrent handling of multiple clients.
-			 */
-			pid = fork();
+      /*
+      * Production mode: fork a child process for each connection.
+      * This provides isolation between tunnel sessions and allows
+      * concurrent handling of multiple clients.
+      */
+      pid = fork();
 #endif
 
-			if (pid < 0)
-				err_sys("fork");
+      if (pid < 0)
+        err_sys("fork");
 
-			if (pid > 0) {
-				/* Parent process: close client socket and continue listening */
-				close(fd);
-			} else {
-				/*
-				 * Child process: close all listening sockets (inherited from parent)
-				 * and return the client connection for tunnel processing.
-				 */
-				for (i = 0; listening_sockets[i] != -1; i++)
-					close(listening_sockets[i]);
-				return fd;
-			}
-		}
+      if (pid > 0) {
+        /* Parent process: close client socket and continue listening */
+        close(fd);
+      } else {
+        /*
+        * Child process: close all listening sockets (inherited from parent)
+        * and return the client connection for tunnel processing.
+        */
+        for (i = 0; listening_sockets[i] != -1; i++)
+          close(listening_sockets[i]);
+        return fd;
+      }
     }
+  }
 }
 
 /**
@@ -512,7 +512,7 @@ int udp_client(const char *s, struct sockaddr_storage *remote_udpaddr)
     parse_address_port(s, &address, &port);
 
     if (!address || !port)
-		log_printf_exit(2, log_err, "Missing address or port in '%s'!", s);
+		  log_printf_exit(2, log_err, "Missing address or port in '%s'!", s);
 
     /*
      * Set up address resolution hints for UDP client:
@@ -529,18 +529,18 @@ int udp_client(const char *s, struct sockaddr_storage *remote_udpaddr)
 
     err = getaddrinfo(address, port, &hints, &res);
     if (err == EAI_SYSTEM)
-		err_sys("getaddrinfo(%s:%s)", address, port);
+		  err_sys("getaddrinfo(%s:%s)", address, port);
     else if (err)
-		log_printf_exit(1, log_err, "Cannot resolve %s:%s: %s", address, port, gai_strerror(err));
+		  log_printf_exit(1, log_err, "Cannot resolve %s:%s: %s", address, port, gai_strerror(err));
 
     /*
      * Clean up dynamically allocated memory from parse_address_port().
      * These strings were allocated with malloc/strdup and must be freed.
      */
     if (address)
-		free(address);
+		  free(address);
     if (port)
-		free(port);
+		  free(port);
 
     /*
      * Create UDP socket for the first resolvable address family.
@@ -548,13 +548,13 @@ int udp_client(const char *s, struct sockaddr_storage *remote_udpaddr)
      * need a socket of the appropriate family for sendto() operations.
      */
     for (ai = res; ai; ai = ai->ai_next) {
-		if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
-			continue;		// ignore socket creation failure, try next address
-		break;				// success - have a UDP socket
+      if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
+        continue;		// ignore socket creation failure, try next address
+      break;				// success - have a UDP socket
     }
 
     if (!ai)
-		err_sys("socket");
+		  err_sys("socket");
 
     log_printf(log_debug, "The UDP destination is %s", ai_print_addr_port(ai));
 
@@ -564,7 +564,7 @@ int udp_client(const char *s, struct sockaddr_storage *remote_udpaddr)
      * for each packet transmission. This avoids repeated address resolution.
      */
     if (remote_udpaddr)
-		memcpy(remote_udpaddr, ai->ai_addr, ai->ai_addrlen);
+		  memcpy(remote_udpaddr, ai->ai_addr, ai->ai_addrlen);
 
     freeaddrinfo(res);
 
@@ -591,7 +591,7 @@ int tcp_client(const char *s)
     parse_address_port(s, &address, &port);
 
     if (!address || !port)
-		log_printf_exit(2, log_err, "Missing address or port in '%s'!", s);
+		  log_printf_exit(2, log_err, "Missing address or port in '%s'!", s);
 
     /*
      * Set up address resolution hints for TCP client:
@@ -608,18 +608,18 @@ int tcp_client(const char *s)
 
     err = getaddrinfo(address, port, &hints, &res);
     if (err == EAI_SYSTEM)
-		err_sys("getaddrinfo(%s:%s)", address, port);
+		  err_sys("getaddrinfo(%s:%s)", address, port);
     else if (err)
-		log_printf_exit(1, log_err, "Cannot resolve %s:%s: %s", address, port, gai_strerror(err));
+		  log_printf_exit(1, log_err, "Cannot resolve %s:%s: %s", address, port, gai_strerror(err));
 
     /*
      * Clean up dynamically allocated memory from parse_address_port().
      * These strings were allocated with malloc/strdup and must be freed.
      */
     if (address)
-		free(address);
+		  free(address);
     if (port)
-		free(port);
+		  free(port);
 
     /*
      * Attempt to connect to each resolved address until one succeeds.
@@ -627,15 +627,15 @@ int tcp_client(const char *s)
      * if available, fall back to IPv4 if IPv6 fails.
      */
     for (ai = res; ai; ai = ai->ai_next) {
-		if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
-			continue;			// ignore socket creation failure, try next address
-		if (connect(fd, (struct sockaddr *) ai->ai_addr, ai->ai_addrlen) == 0)
-			break;				// success - connected to remote host
-		close(fd);					// connection failed, clean up and try next
+      if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
+        continue;			// ignore socket creation failure, try next address
+      if (connect(fd, (struct sockaddr *) ai->ai_addr, ai->ai_addrlen) == 0)
+        break;				// success - connected to remote host
+      close(fd);					// connection failed, clean up and try next
     }
 
     if (!ai)
-		err_sys("Cannot connect to %s", s);
+	  	err_sys("Cannot connect to %s", s);
 
     log_printf(log_info, "TCP connection opened to %s", ai_print_addr_port(ai));
 
