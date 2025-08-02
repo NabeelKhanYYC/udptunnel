@@ -33,7 +33,7 @@ Available targets:
 
 ### Build Output
 
-Objects go to `build/objs/` and the final binary is in `build/udptunnel`.
+Objects go to `build/output/objs/` and the final binary is in `build/output/udptunnel`. Package files (DEB/RPM) are automatically created in `build/output/` during the build process.
 
 ### Using the Binary Outside Docker
 
@@ -46,14 +46,37 @@ The Docker build process automatically makes the `udptunnel` binary available on
 
 2. **Use the binary directly from the host**:
    ```bash
-   # Binary is available at ./build/udptunnel
-   ./build/udptunnel --help
+   # Binary is available at ./build/output/udptunnel
+   ./build/output/udptunnel --help
    
    # Copy to system path if needed
-   sudo cp ./build/udptunnel /usr/local/bin/
+   sudo cp ./build/output/udptunnel /usr/local/bin/
    ```
 
-The volume binding in docker-compose.yml maps `./build:/opt/build/build:rw`, so build artifacts are automatically available on the host without needing to extract them from containers.
+The volume binding in docker-compose.yml maps `./build:/opt/build/build:rw`, so build artifacts (including DEB/RPM packages) are automatically available on the host without needing to extract them from containers.
+
+## Package Installation
+
+The build process automatically creates DEB and RPM packages for easy system installation:
+
+### Installing Built Packages
+
+After building, you can install UDP Tunnel system-wide using the generated packages:
+
+```bash
+# For Debian/Ubuntu systems
+sudo dpkg -i ./build/output/udptunnel-1.2.2.amd64.deb
+
+# For RedHat/CentOS/Fedora systems  
+sudo rpm -i ./build/output/udptunnel-1.2.2.amd64.rpm
+```
+
+### Package Features
+
+- **System Integration**: Packages install to standard system paths
+- **Systemd Support**: Includes systemd service integration when available
+- **Clean Uninstall**: Standard package manager removal
+- **Dependencies**: Automatically handles runtime dependencies
 
 ### Advanced 
 
@@ -70,13 +93,18 @@ For native building on your host system:
 ```
 
 Available targets:
-- `build` - Native build (default)
-- `clean` - Clean build artifacts
-- `all` - Clean then build
-- `debug` - Build with debug flags
-- `install` - Install to system (native builds only)
+- `build` - Run both Make and CMake builds, create packages (default)
+- `clean` - Clean all build artifacts from both build systems
+- `all` - Clean then build both systems
+- `debug` - Build both systems with debug flags
+- `install` - Install from both build systems to system paths
 
-Requirements: C compiler (gcc/clang), make, pkg-config (optional), libsystemd-dev (optional)
+The build script automatically:
+- Runs both Make and CMake build processes
+- Creates DEB and RPM packages in `build/output/`
+- Handles all dependencies and configuration
+
+Requirements: C compiler (gcc/clang), cmake, make, pkg-config (optional), libsystemd-dev (optional)
 
 ## Configuration
 
