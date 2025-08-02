@@ -13,6 +13,7 @@ FROM base AS build
 RUN apt-get install -y build-essential
 RUN apt-get install -y pkg-config
 RUN apt-get install -y libsystemd-dev
+RUN apt-get install -y cmake
 
 # Set working directory
 RUN mkdir -p /opt/build
@@ -23,7 +24,7 @@ WORKDIR /opt/build
 FROM build AS build-container
 
 COPY ../ /opt/build
-RUN cd build && make
+RUN ./bin/build.sh all
 
 # Target for running a container
 FROM base AS container

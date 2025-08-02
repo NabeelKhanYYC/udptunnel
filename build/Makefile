@@ -4,7 +4,7 @@ prefix = /usr/local
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 PROJECT_ROOT := $(abspath $(MAKEFILE_DIR)/..)
 SRC_DIR := $(PROJECT_ROOT)/src
-BUILD_DIR := $(MAKEFILE_DIR)/output
+BUILD_DIR := $(MAKEFILE_DIR)output
 OBJ_DIR := $(BUILD_DIR)/objs
 
 CFLAGS ?= -g -O2
