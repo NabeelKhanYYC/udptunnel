@@ -108,25 +108,62 @@ Requirements: C compiler (gcc/clang), cmake, make, pkg-config (optional), libsys
 
 ## Configuration
 
-UDP Tunnel can be configured through environment variables when using Docker containers. For detailed configuration options, see the `.env.example` file which contains comprehensive documentation for all available environment variables including:
-
-- **UDPTUNNEL_MODE**: Server or client mode operation
-- **UDPTUNNEL_SOURCE_HOST**: Source host binding configuration
-- **UDPTUNNEL_SOURCE_PORT**: Source port binding configuration  
-- **UDPTUNNEL_DESTINATION_HOST**: Target destination host settings
-- **UDPTUNNEL_DESTINATION_PORT**: Target destination port settings
-- **UDPTUNNEL_TIMEOUT**: Connection timeout settings
-- **UDPTUNNEL_VERBOSE**: Logging verbosity levels
+UDP Tunnel can be configured through environment variables when using Docker containers. For detailed configuration options, see the `.env.example` file which contains comprehensive documentation for all available environment variables.
 
 Copy `.env.example` to `.env` and modify the values according to your needs when using `docker-compose`.
 
 ## Usage Examples
 
-Here are common configuration examples for different use cases:
+### Binary Usage
 
-### TCP-to-UDP Server
+Direct command line usage with the built or installed udptunnel binary.
+
+#### TCP-to-UDP Server Mode
 Accept TCP connections and relay to UDP service:
 ```bash
+# Basic server: listen on TCP port 8080, relay to UDP port 9090 on target-host
+./build/output/udptunnel -s 0.0.0.0:8080 target-host:9090
+
+# With timeout and verbose logging
+./build/output/udptunnel -s 0.0.0.0:8080 target-host:9090 -t 300 -v
+
+# Minimal configuration (listen on all interfaces)
+./build/output/udptunnel -s :8080 backend:5000
+```
+
+#### UDP-to-TCP Client Mode
+Accept UDP packets and encapsulate in TCP connections:
+```bash
+# Basic client: listen on UDP port 9090, relay via TCP to port 8080 on tcp-server
+./build/output/udptunnel -c 0.0.0.0:9090 tcp-server:8080
+
+# With debug verbosity (multiple -v flags increase verbosity)
+./build/output/udptunnel -c 0.0.0.0:9090 tcp-server:8080 -v -v -v
+
+# With timeout settings
+./build/output/udptunnel -c :7000 debug-server:7001 -t 600 -v
+```
+
+#### Command Line Options
+```bash
+# Get help and see all available options
+./build/output/udptunnel --help
+
+# Common patterns:
+# -s <local:port> <remote:port>  # Server mode
+# -c <local:port> <remote:port>  # Client mode  
+# -t <seconds>                   # Timeout
+# -v                             # Verbose (repeat for more verbosity)
+```
+
+### Container Usage
+
+Environment variable configuration for Docker containers and docker-compose.
+
+#### TCP-to-UDP Server (Container)
+Configure via environment variables in `.env` file or docker-compose:
+```bash
+# In .env file or docker-compose environment
 UDPTUNNEL_MODE=server
 UDPTUNNEL_SOURCE_HOST=0.0.0.0
 UDPTUNNEL_SOURCE_PORT=8080
@@ -136,9 +173,10 @@ UDPTUNNEL_TIMEOUT=300
 UDPTUNNEL_VERBOSE=1
 ```
 
-### UDP-to-TCP Client
-Accept UDP packets and relay via TCP:
+#### UDP-to-TCP Client (Container)
+Client mode configuration:
 ```bash
+# In .env file or docker-compose environment
 UDPTUNNEL_MODE=client
 UDPTUNNEL_SOURCE_HOST=0.0.0.0
 UDPTUNNEL_SOURCE_PORT=9090
@@ -148,24 +186,13 @@ UDPTUNNEL_TIMEOUT=600
 UDPTUNNEL_VERBOSE=2
 ```
 
-### Simple TCP-to-UDP Relay (Minimal Config)
-Basic relay with minimal configuration:
+#### Minimal Container Configuration
 ```bash
+# Basic server relay
 UDPTUNNEL_MODE=server
 UDPTUNNEL_SOURCE_PORT=8080
 UDPTUNNEL_DESTINATION_HOST=backend
 UDPTUNNEL_DESTINATION_PORT=5000
-```
-
-### Debug Configuration
-High verbosity for troubleshooting:
-```bash
-UDPTUNNEL_MODE=client
-UDPTUNNEL_SOURCE_HOST=0.0.0.0
-UDPTUNNEL_SOURCE_PORT=7000
-UDPTUNNEL_DESTINATION_HOST=debug-server
-UDPTUNNEL_DESTINATION_PORT=7001
-UDPTUNNEL_VERBOSE=3
 ```
 
 ## Project Structure
