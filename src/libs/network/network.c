@@ -318,18 +318,23 @@ int *tcp_listener(const char *s)
      * to the dynamically growing fd_list array.
      */
     for (ai = res; ai; ai = ai->ai_next) {
-		if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
-			continue;				// ignore socket creation failure, try next address
+	if ((fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol)) < 0)
+	    continue;		// ignore socket creation failure, try next address
 		/*
 		 * Enable SO_REUSEADDR to allow immediate reuse of the port after
 		 * server restart, avoiding "Address already in use" errors during
 		 * development and testing.
 		 */
-		opt = 1;
-		if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
-			err_sys("setsockopt(SOL_SOCKET, SO_REUSEADDR)");
-		if (bind(fd, (struct sockaddr *) ai->ai_addr, ai->ai_addrlen) < 0)
-			err_sys("Cannot bind to %s", s);
+	opt = 1;
+	if (ai->ai_family == AF_INET6) {
+	    /* we are going to bind to IPv6 address only */
+	    if (setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &opt, sizeof(opt)) < 0)
+	        err_sys("setsockopt(IPPROTO_IPV6, IPV6_V6ONLY)");
+	}
+	if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt)) < 0)
+	    err_sys("setsockopt(SOL_SOCKET, SO_REUSEADDR)");
+	if (bind(fd, (struct sockaddr *) ai->ai_addr, ai->ai_addrlen) < 0)
+	    err_sys("Cannot bind to %s", s);
 
 		/* success */
 		if (listen(fd, 128) < 0)
