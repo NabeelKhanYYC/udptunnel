@@ -7,25 +7,32 @@ x-build-configuration: &build-configuration
   profiles:
     - build
   volumes:
+    - ./LICENSE:/opt/build/LICENSE:ro
+    - ./bin:/opt/build/bin:ro
+    - ./build:/opt/build/build:ro
     - ./src:/opt/build/src:ro
-    - ./build:/opt/build/build:rw
-  working_dir: /opt/build/build
+    - ./build/output:/opt/build/build/output:rw
+    - ./build/cache:/opt/build/build/cache:rw
+  working_dir: /opt/build
+  environment:
+    - UDPTUNNEL_ARCH=${UDPTUNNEL_ARCH:-}
 
 services:
   build:
     <<: *build-configuration
-    command: make
+    command: ./bin/build.sh build
   clean:
     <<: *build-configuration
-    command: make clean
+    command: ./bin/build.sh clean
   all:
     <<: *build-configuration
-    command: sh -c "make clean && make"
+    command: ./bin/build.sh all
   debug:
     <<: *build-configuration
-    environment:
-      - CFLAGS=-g -O0 -DDEBUG
-    command: make
+    command: ./bin/build.sh debug
+  release:
+    <<: *build-configuration
+    command: ./bin/build.sh release
   
   udptunnel:
     build:

@@ -33,7 +33,7 @@ Available targets:
 
 ### Build Output
 
-Objects go to `build/output/objs/` and the final binary is in `build/output/udptunnel`. Package files (DEB/RPM) are automatically created in `build/output/` during the build process.
+Objects go to `build/output/{arch}/objs/` and the final binary is in `build/output/{arch}/udptunnel`. Package files (DEB/RPM) are automatically created in `build/output/{arch}/` during the build process, where `{arch}` is the target architecture (amd64, arm64, armhf).
 
 ### Using the Binary Outside Docker
 
@@ -46,11 +46,12 @@ The Docker build process automatically makes the `udptunnel` binary available on
 
 2. **Use the binary directly from the host**:
    ```bash
-   # Binary is available at ./build/output/udptunnel
-   ./build/output/udptunnel --help
+   # Binaries are in architecture-specific directories: ./build/output/{arch}/udptunnel
+   # For local builds, use your system architecture (typically amd64)
+   ./build/output/amd64/udptunnel --help
    
    # Copy to system path if needed
-   sudo cp ./build/output/udptunnel /usr/local/bin/
+   sudo cp ./build/output/amd64/udptunnel /usr/local/bin/
    ```
 
 The volume binding in docker-compose.yml maps `./build:/opt/build/build:rw`, so build artifacts (including DEB/RPM packages) are automatically available on the host without needing to extract them from containers.
@@ -65,10 +66,10 @@ After building, you can install UDP Tunnel system-wide using the generated packa
 
 ```bash
 # For Debian/Ubuntu systems
-sudo dpkg -i ./build/output/udptunnel-1.2.2.amd64.deb
+sudo dpkg -i ./build/output/amd64/udptunnel-1.2.2.amd64.deb
 
 # For RedHat/CentOS/Fedora systems  
-sudo rpm -i ./build/output/udptunnel-1.2.2.amd64.rpm
+sudo rpm -i ./build/output/amd64/udptunnel-1.2.2.amd64.rpm
 ```
 
 ### Package Features
@@ -83,6 +84,51 @@ sudo rpm -i ./build/output/udptunnel-1.2.2.amd64.rpm
 #### Docker Build Targets 
 
 You can also run `docker compose --profile build up <service>` directly with services: `build`, `clean`, `all`, `debug`.
+
+#### Interactive Container Access
+
+For debugging, development, or manual operations, you can access the containerized build environment interactively:
+
+**Access container shell:**
+```bash
+# Interactive bash shell in build container
+docker compose --profile build run --rm build bash
+
+# Run specific commands in container
+docker compose --profile build run --rm build ./bin/build.sh build
+docker compose --profile build run --rm build which cmake
+```
+
+**Debug build issues:**
+```bash
+# Check what's available in the container
+docker compose --profile build run --rm build ls -la /opt/build/
+
+# Verify cmake installation and version
+docker compose --profile build run --rm build cmake --version
+
+# Check architecture detection
+docker compose --profile build run --rm build uname -m
+
+# Test cross-compilation setup
+UDPTUNNEL_ARCH=arm64 docker compose --profile build run --rm build ./bin/build.sh build
+
+# Check architecture-specific build outputs
+docker compose --profile build run --rm build ls -la build/output/
+```
+
+**Development workflow:**
+```bash
+# Interactive development session
+docker compose --profile build run --rm build bash
+
+# Inside container, you can:
+# - Edit files (if mounted with write access)
+# - Run builds manually: ./bin/build.sh build
+# - Inspect build artifacts: ls -la build/output/{arch}/
+# - Debug compilation issues
+# - Test different architectures
+```
 
 #### Native Build
 
@@ -101,10 +147,59 @@ Available targets:
 
 The build script automatically:
 - Runs both Make and CMake build processes
-- Creates DEB and RPM packages in `build/output/`
+- Creates DEB and RPM packages in `build/output/{arch}/`
 - Handles all dependencies and configuration
 
 Requirements: C compiler (gcc/clang), cmake, make, pkg-config (optional), libsystemd-dev (optional)
+
+### Multi-Architecture Support
+
+UDP Tunnel supports building for multiple architectures. The build system automatically detects your system architecture, but you can override this with the `UDPTUNNEL_ARCH` environment variable.
+
+**Supported architectures:**
+- `amd64` - x86_64 (default for x86_64 systems)
+- `arm64` - ARM64/AArch64 
+- `armhf` - ARM v7 hard-float
+
+**Usage examples:**
+```bash
+# Auto-detect architecture (default behavior)
+./bin/build.sh build
+
+# Override architecture for cross-compilation
+UDPTUNNEL_ARCH=arm64 ./bin/build.sh build
+
+# Build with cross-compiler
+UDPTUNNEL_ARCH=armhf CC=arm-linux-gnueabihf-gcc ./bin/build.sh build
+
+# Docker build for specific architecture
+UDPTUNNEL_ARCH=arm64 docker-compose --profile build up build
+```
+
+### Cross-Compilation Detection
+
+The build system automatically detects when cross-compilation is required and provides helpful guidance:
+
+**When you specify a different target architecture:**
+```bash
+# Example: Building ARM64 on x86_64 system
+UDPTUNNEL_ARCH=arm64 ./bin/build.sh build
+```
+
+**The build system will warn you and suggest the appropriate cross-compiler:**
+```
+Warning: Cross-compilation required (host: amd64, target: arm64)
+Suggested: Install cross-compiler with: apt-get install gcc-aarch64-linux-gnu
+Then run: UDPTUNNEL_ARCH=arm64 CC=aarch64-linux-gnu-gcc ./bin/build.sh build
+```
+
+**Supported cross-compiler suggestions:**
+- **ARM64**: `gcc-aarch64-linux-gnu` → `CC=aarch64-linux-gnu-gcc`
+- **ARM v7**: `gcc-arm-linux-gnueabihf` → `CC=arm-linux-gnueabihf-gcc`
+
+**Note:** 32-bit x86 (i386) architecture support has been removed due to cross-compiler compatibility issues.
+
+The generated packages and binaries will be named according to the target architecture (e.g., `udptunnel-1.2.2.arm64.deb`) and organized in architecture-specific directories (`build/output/{arch}/`).
 
 ## Configuration
 
@@ -122,32 +217,32 @@ Direct command line usage with the built or installed udptunnel binary.
 Accept TCP connections and relay to UDP service:
 ```bash
 # Basic server: listen on TCP port 8080, relay to UDP port 9090 on target-host
-./build/output/udptunnel -s 0.0.0.0:8080 target-host:9090
+./build/output/amd64/udptunnel -s 0.0.0.0:8080 target-host:9090
 
 # With timeout and verbose logging
-./build/output/udptunnel -s 0.0.0.0:8080 target-host:9090 -t 300 -v
+./build/output/amd64/udptunnel -s 0.0.0.0:8080 target-host:9090 -t 300 -v
 
 # Minimal configuration (listen on all interfaces)
-./build/output/udptunnel -s :8080 backend:5000
+./build/output/amd64/udptunnel -s :8080 backend:5000
 ```
 
 #### UDP-to-TCP Client Mode
 Accept UDP packets and encapsulate in TCP connections:
 ```bash
 # Basic client: listen on UDP port 9090, relay via TCP to port 8080 on tcp-server
-./build/output/udptunnel -c 0.0.0.0:9090 tcp-server:8080
+./build/output/amd64/udptunnel -c 0.0.0.0:9090 tcp-server:8080
 
 # With debug verbosity (multiple -v flags increase verbosity)
-./build/output/udptunnel -c 0.0.0.0:9090 tcp-server:8080 -v -v -v
+./build/output/amd64/udptunnel -c 0.0.0.0:9090 tcp-server:8080 -v -v -v
 
 # With timeout settings
-./build/output/udptunnel -c :7000 debug-server:7001 -t 600 -v
+./build/output/amd64/udptunnel -c :7000 debug-server:7001 -t 600 -v
 ```
 
 #### Command Line Options
 ```bash
 # Get help and see all available options
-./build/output/udptunnel --help
+./build/output/amd64/udptunnel --help
 
 # Common patterns:
 # -s <local:port> <remote:port>  # Server mode

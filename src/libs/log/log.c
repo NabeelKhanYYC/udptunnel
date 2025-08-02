@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301 USA
  */
 
+#define _GNU_SOURCE  /* for vsyslog */
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -64,6 +65,7 @@ static void format_rfc3339_timestamp(char *buffer, size_t buffer_size)
         char tz_min1 = buffer[len-3];
         char tz_min2 = buffer[len-2];
         char tz_last = buffer[len-1];
+        buffer[len-3] = tz_hour;
         buffer[len-2] = ':';
         buffer[len-1] = tz_min1;
         buffer[len] = tz_min2;
