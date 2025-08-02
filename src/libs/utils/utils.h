@@ -17,39 +17,39 @@
  */
 
 #ifndef __UTILS_H__
-#define __UTILS_H__
+    #define __UTILS_H__
 
-#if !defined __GNUC__ && !defined __attribute__
-#define __attribute__(x) /*NOTHING*/
-#endif
+    #if !defined __GNUC__ && !defined __attribute__
+        #define __attribute__(x) /*NOTHING*/
+    #endif
 
-#ifndef AI_IDN
-#define AI_IDN 0
-#endif
+    #ifndef AI_IDN
+        #define AI_IDN 0
+    #endif
 
-#ifndef AI_ADDRCONFIG
-#define AI_ADDRCONFIG 0
-#endif
+    #ifndef AI_ADDRCONFIG
+        #define AI_ADDRCONFIG 0
+    #endif
 
-#ifndef SD_LISTEN_FDS_START
-#define SD_LISTEN_FDS_START 0
-#define sd_listen_fds(a) 0
-#define sd_notify(a, b)
-#define sd_is_socket(a, b, c, d) -1
-#endif
+    #ifndef SD_LISTEN_FDS_START
+        #define SD_LISTEN_FDS_START 0
+        #define sd_listen_fds(a) 0
+        #define sd_notify(a, b)
+        #define sd_is_socket(a, b, c, d) -1
+    #endif
 
-#if defined __GLIBC__ || (defined __APPLE__ && defined __MACH__)
-#define HAVE_GETOPT_LONG
-#endif
+    #if defined __GLIBC__ || (defined __APPLE__ && defined __MACH__)
+        #define HAVE_GETOPT_LONG
+    #endif
 
-#ifdef HAVE_GETOPT_LONG
-#define GETOPT_LONGISH(c, v, o, l, i) getopt_long(c, v, o, l, i)
-#else
-#define GETOPT_LONGISH(c, v, o, l, i) getopt(c, v, o)
-#endif
+    #ifdef HAVE_GETOPT_LONG
+        #define GETOPT_LONGISH(c, v, o, l, i) getopt_long(c, v, o, l, i)
+    #else
+        #define GETOPT_LONGISH(c, v, o, l, i) getopt(c, v, o)
+    #endif
 
-#define NOFAIL(ptr) do_nofail((ptr), __FILE__, __LINE__)
+    #define NOFAIL(ptr) do_nofail((ptr), __FILE__, __LINE__)
 
-void *do_nofail(void *ptr, const char *file, const int line);
+    void *do_nofail(void *ptr, const char *file, const int line);
 
 #endif

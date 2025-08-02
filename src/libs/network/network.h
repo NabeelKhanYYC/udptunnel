@@ -17,24 +17,24 @@
  */
 
 #ifndef __NETWORK_H__
-#define __NETWORK_H__
+    #define __NETWORK_H__
 
-#define SET_MAX(fd) do { if (max < (fd) + 1) { max = (fd) + 1; } } while (0)
+    #define SET_MAX(fd) do { if (max < (fd) + 1) { max = (fd) + 1; } } while (0)
 
-char *print_addr_port(const struct sockaddr *addr, socklen_t addrlen);
+    char *print_addr_port(const struct sockaddr *addr, socklen_t addrlen);
 
-int udp_listener(const char *s);
+    int udp_listener(const char *s);
 
-int *tcp_listener(const char *s);
+    int *tcp_listener(const char *s);
 
-int udp_listener_sa(const int num);
+    int udp_listener_sa(const int num);
 
-int *tcp_listener_sa(const int num);
+    int *tcp_listener_sa(const int num);
 
-int udp_client(const char *s, struct sockaddr_storage *remote_udpaddr);
+    int udp_client(const char *s, struct sockaddr_storage *remote_udpaddr);
 
-int tcp_client(const char *s);
+    int tcp_client(const char *s);
 
-int accept_connections(int listening_sockets[]);
+    int accept_connections(int listening_sockets[]);
 
 #endif

@@ -1,6 +1,6 @@
 # UDP Tunnel 
 
-UDP Tunnel is a fork of Marco d'Itri's (@rfc1036) [rfc1036/udptunnel](https://github.com/rfc1036/udptunnel) focused on making it more accessible through improved build processes and containerization. He did excellent work when he created the original source code which is why it has truly stood the test of time.
+UDP Tunnel is a fork of Marco d'Itri's ([@rfc1036](https://github.com/rfc1036)) [rfc1036/udptunnel](https://github.com/rfc1036/udptunnel) focused on making it more accessible through improved build processes and containerization. He did excellent work when he created the original source code which is why it has truly stood the test of time.
 
 Feel free to send over any PR's for expanded capabilities or create issues for any features you'd like created or merged from any of the other forks.
 

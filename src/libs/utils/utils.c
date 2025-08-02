@@ -24,7 +24,7 @@
 void *do_nofail(void *ptr, const char *file, const int line)
 {
     if (ptr)
-	return ptr;
+	    return ptr;
 
     fprintf(stderr, "Memory allocation failure at %s:%d.", file, line);
     exit(1);

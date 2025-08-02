@@ -41,16 +41,16 @@ RUN groupadd -r udptunnel && useradd -r -g udptunnel udptunnel
 # Switch to udptunnel user
 USER udptunnel
 
+# Set the entrypoint so we can run this using docker run [options]
 ENTRYPOINT ["/usr/bin/udptunnel"]
 
 # Target for running a container via compose
 FROM container AS compose
 
+# Copy over the bootloader
 USER root
-
 COPY ../docker/bin/boot /boot/initialize
 RUN chmod +x /boot/initialize
-
 USER udptunnel
 
 ENTRYPOINT []

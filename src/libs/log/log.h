@@ -19,49 +19,49 @@
  */
 
 #ifndef __LOG_H__
-#define __LOG_H__
+    #define __LOG_H__
 
-#include <stdarg.h>
+    #include <stdarg.h>
 
-#include "../utils/utils.h"
+    #include "../utils/utils.h"
 
-typedef enum log_level {
-    /* the value of the first 3 bits matches the syslog(3) levels */
-    log_emerg = 0,
-    log_alert = 1,
-    log_crit = 2,
-    log_err = 3,
-    log_warning = 4,
-    log_notice = 5,
-    log_info = 6,
-    log_debug = 7,
-    log_nothing = 8,
+    typedef enum log_level {
+        /* the value of the first 3 bits matches the syslog(3) levels */
+        log_emerg = 0,
+        log_alert = 1,
+        log_crit = 2,
+        log_err = 3,
+        log_warning = 4,
+        log_notice = 5,
+        log_info = 6,
+        log_debug = 7,
+        log_nothing = 8,
 
-    /* the following entries are bit flags to be OR'ed with the level */
-    log_stderr = 0x10,
-    log_syslog = 0x20,
-    log_strerror = 0x40,
-} log_level;
+        /* the following entries are bit flags to be OR'ed with the level */
+        log_stderr = 0x10,
+        log_syslog = 0x20,
+        log_strerror = 0x40,
+    } log_level;
 
-/* remove the flags from log_level */
-#define LOG_LEVEL_MASK 0xf
+    /* remove the flags from log_level */
+    #define LOG_LEVEL_MASK 0xf
 
-log_level log_get_filter_level(void);
+    log_level log_get_filter_level(void);
 
-void log_set_options(log_level filter_level_new);
+    void log_set_options(log_level filter_level_new);
 
-__attribute__ ((format(printf, 2, 3)))
-void log_printf(log_level level, const char *format, ...);
+    __attribute__ ((format(printf, 2, 3)))
+    void log_printf(log_level level, const char *format, ...);
 
-__attribute__ ((format(printf, 3, 4), noreturn))
-void log_printf_exit(int status, log_level level, const char *format, ...);
+    __attribute__ ((format(printf, 3, 4), noreturn))
+    void log_printf_exit(int status, log_level level, const char *format, ...);
 
-__attribute__ ((format(printf, 2, 3)))
-void log_printf_err(log_level level, const char *format, ...);
+    __attribute__ ((format(printf, 2, 3)))
+    void log_printf_err(log_level level, const char *format, ...);
 
-__attribute__ ((format(printf, 3, 4), noreturn))
-void log_printf_err_exit(int status, log_level level, const char *format, ...);
+    __attribute__ ((format(printf, 3, 4), noreturn))
+    void log_printf_err_exit(int status, log_level level, const char *format, ...);
 
-#define err_sys(...)  log_printf_err_exit(1, log_err, __VA_ARGS__)
+    #define err_sys(...)  log_printf_err_exit(1, log_err, __VA_ARGS__)
 
 #endif				/* !__LOG_H__ */
