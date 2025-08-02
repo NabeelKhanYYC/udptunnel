@@ -24,11 +24,53 @@
 #include <string.h>
 #include <errno.h>
 #include <syslog.h>
+#include <time.h>
 
 #include "log.h"
 #include "../utils/utils.h"
 
 static log_level filter_level = log_info;
+
+static void format_rfc3339_timestamp(char *buffer, size_t buffer_size)
+{
+    struct timespec ts;
+    struct tm *tm_info;
+    int milliseconds;
+
+    if (clock_gettime(CLOCK_REALTIME, &ts) != 0) {
+        snprintf(buffer, buffer_size, "1970-01-01T00:00:00.000+00:00");
+        return;
+    }
+
+    tm_info = localtime(&ts.tv_sec);
+    if (tm_info == NULL) {
+        snprintf(buffer, buffer_size, "1970-01-01T00:00:00.000+00:00");
+        return;
+    }
+
+    milliseconds = ts.tv_nsec / 1000000;
+
+    strftime(buffer, buffer_size, "%Y-%m-%dT%H:%M:%S", tm_info);
+    
+    size_t len = strlen(buffer);
+    snprintf(buffer + len, buffer_size - len, ".%03d", milliseconds);
+    
+    len = strlen(buffer);
+    strftime(buffer + len, buffer_size - len, "%z", tm_info);
+    
+    len = strlen(buffer);
+    if (len >= 5 && buffer[len-2] != ':') {
+        char tz_hour = buffer[len-4];
+        char tz_min1 = buffer[len-3];
+        char tz_min2 = buffer[len-2];
+        char tz_last = buffer[len-1];
+        buffer[len-2] = ':';
+        buffer[len-1] = tz_min1;
+        buffer[len] = tz_min2;
+        buffer[len+1] = tz_last;
+        buffer[len+2] = '\0';
+    }
+}
 
 /*
  * Return the appropriate file handle (stdout vs. stderr) for the log level.
@@ -72,6 +114,10 @@ static void log_doit(log_level level, const char *format, va_list args)
         return;
     }
 
+    char timestamp[32];
+    format_rfc3339_timestamp(timestamp, sizeof(timestamp));
+    fprintf(file_for_level(level), "[%s] ", timestamp);
+    
     vfprintf(file_for_level(level), format, args);
     if (level & log_strerror)
 	    fprintf(file_for_level(level), ": %s", strerror(errno));
