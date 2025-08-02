@@ -23,7 +23,7 @@ WORKDIR /opt/build
 FROM build AS build-container
 
 COPY ../ /opt/build
-RUN cd src && make
+RUN cd build && make
 
 # Target for running a container
 FROM base AS container
@@ -33,7 +33,7 @@ RUN ln -fs /usr/share/zoneinfo/America/Edmonton /etc/localtime
 RUN DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends tzdata
 
 # Copy over binary
-COPY --from=build-container /opt/build/build/udptunnel /usr/bin/udptunnel
+COPY --from=build-container /opt/build/build/output/udptunnel /usr/bin/udptunnel
 
 # Create udptunnel user and group
 RUN groupadd -r udptunnel && useradd -r -g udptunnel udptunnel

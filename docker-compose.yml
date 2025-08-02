@@ -9,7 +9,7 @@ x-build-configuration: &build-configuration
   volumes:
     - ./src:/opt/build/src:ro
     - ./build:/opt/build/build:rw
-  working_dir: /opt/build/src
+  working_dir: /opt/build/build
 
 services:
   build:
