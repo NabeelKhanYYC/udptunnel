@@ -30,10 +30,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 # Create build directory if it doesn't exist
-mkdir -p build/objs
+mkdir -p ../build/output/objs
 
-# Change to src directory for all make operations
-cd ../src
+# Change to build directory for all make operations
+cd ../build
 
 case $TARGET in
     build)
@@ -79,7 +79,7 @@ case $TARGET in
         ;;
 esac
 
-if [ "$TARGET" != "clean" ] && [ -f "../../build/udptunnel" ]; then
+if [ "$TARGET" != "clean" ] && [ -f "./output/udptunnel" ]; then
     echo "Build completed successfully!"
-    echo "Binary: $SCRIPT_DIR/../build/udptunnel"
+    echo "Binary: $SCRIPT_DIR/../build/output/udptunnel"
 fi
