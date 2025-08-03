@@ -104,13 +104,43 @@ prepare_build() {
     check_dependencies
     detect_target_arch
     check_cross_compilation
+    
+    # Create libcap stub library for static linking only
+    if [ "$UDPTUNNEL_STATIC" = "1" ] || [ "$UDPTUNNEL_STATIC" = "true" ]; then
+        echo "Creating libcap stub library for static linking..."
+        mkdir -p ../build/output/objs/$TARGET_ARCH
+        rm -f ../build/output/objs/$TARGET_ARCH/libcap_stub.a ../build/output/objs/$TARGET_ARCH/libcap_stub.o ../build/output/objs/$TARGET_ARCH/libcap_stub.c
+        cat > ../build/output/objs/$TARGET_ARCH/libcap_stub.c << 'EOF'
+// Minimal libcap stub implementation for static linking
+#include <sys/types.h>
+#include <stddef.h>
+#include <errno.h>
+
+typedef struct _cap_struct *cap_t;
+typedef enum { CAP_EFFECTIVE=0, CAP_PERMITTED=1, CAP_INHERITABLE=2 } cap_flag_t;
+typedef enum { CAP_CLEAR=0, CAP_SET=1 } cap_flag_value_t;
+
+// Stub implementations that return safe defaults
+cap_t cap_get_proc(void) { return NULL; }
+int cap_set_proc(cap_t cap_p) { return 0; }
+int cap_free(void *obj_d) { return 0; }
+cap_t cap_init(void) { return NULL; }
+cap_t cap_dup(cap_t cap_p) { return NULL; }
+int cap_get_flag(cap_t cap_p, int cap, cap_flag_t flag, cap_flag_value_t *value_p) { if(value_p) *value_p = CAP_CLEAR; return 0; }
+int cap_set_flag(cap_t cap_p, cap_flag_t flag, int ncap, const int *caps, cap_flag_value_t value) { return 0; }
+int cap_compare(cap_t cap_a, cap_t cap_b) { return 0; }
+EOF
+        ${CC:-gcc} -c ../build/output/objs/$TARGET_ARCH/libcap_stub.c -o ../build/output/objs/$TARGET_ARCH/libcap_stub.o
+        ar rcs ../build/output/objs/$TARGET_ARCH/libcap_stub.a ../build/output/objs/$TARGET_ARCH/libcap_stub.o
+        echo "Libcap stub library created at ../build/output/objs/$TARGET_ARCH/libcap_stub.a"
+    fi
 }
 
 # Get script directory and ensure we're in the right place
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
-# Create build directory if it doesn't exist
+# Create build directories if they don't exist
 mkdir -p ../build/output/objs
 
 # Change to build directory for all CMake operations
@@ -125,7 +155,6 @@ configure_cmake() {
         # For cross-compilation, always reconfigure CMake to ensure correct compiler
         if [ ! -f "cache/CMakeCache.txt" ] || ! cmake --build cache --dry-run &>/dev/null || [ -n "$CC" ]; then
             echo "Configuring CMake in cache directory..."
-            echo "Debug: CC=$CC, CMAKE_C_COMPILER will be set to: $CC"
             rm -f cache/CMakeCache.txt  # Force reconfiguration for cross-compilation
             
             # Set pkg-config path for cross-compilation
@@ -142,7 +171,6 @@ configure_cmake() {
         # For cross-compilation, always reconfigure CMake to ensure correct compiler
         if [ ! -f "CMakeCache.txt" ] || ! cmake --build . --dry-run &>/dev/null || [ -n "$CC" ]; then
             echo "Configuring CMake..."
-            echo "Debug: CC=$CC, CMAKE_C_COMPILER will be set to: $CC"
             rm -f CMakeCache.txt  # Force reconfiguration for cross-compilation
             
             # Set pkg-config path for cross-compilation
@@ -174,6 +202,28 @@ case $TARGET in
             echo "3. Creating packages..."
             cpack
         fi
+        
+        # Create default symlink to current build for system architecture
+        HOST_ARCH=$(uname -m)
+        case $HOST_ARCH in
+            x86_64) DEFAULT_ARCH="amd64" ;;
+            aarch64) DEFAULT_ARCH="arm64" ;;
+            armv7l) DEFAULT_ARCH="armhf" ;;
+            *) DEFAULT_ARCH="amd64" ;;
+        esac
+        
+        # Determine build type
+        if [ "$UDPTUNNEL_STATIC" = "1" ] || [ "$UDPTUNNEL_STATIC" = "true" ]; then
+            BUILD_TYPE="static"
+        else
+            BUILD_TYPE="dynamic"
+        fi
+        
+        cd output
+        rm -f default udptunnel
+        ln -sf "$BUILD_TYPE/$DEFAULT_ARCH" default
+        ln -sf "default/udptunnel" udptunnel
+        cd ..
         ;;
     clean)
         echo "Cleaning build artifacts..."
@@ -204,6 +254,28 @@ case $TARGET in
             echo "3. Creating packages..."
             cpack
         fi
+        
+        # Create default symlink to current build for system architecture
+        HOST_ARCH=$(uname -m)
+        case $HOST_ARCH in
+            x86_64) DEFAULT_ARCH="amd64" ;;
+            aarch64) DEFAULT_ARCH="arm64" ;;
+            armv7l) DEFAULT_ARCH="armhf" ;;
+            *) DEFAULT_ARCH="amd64" ;;
+        esac
+        
+        # Determine build type
+        if [ "$UDPTUNNEL_STATIC" = "1" ] || [ "$UDPTUNNEL_STATIC" = "true" ]; then
+            BUILD_TYPE="static"
+        else
+            BUILD_TYPE="dynamic"
+        fi
+        
+        cd output
+        rm -f default udptunnel
+        ln -sf "$BUILD_TYPE/$DEFAULT_ARCH" default
+        ln -sf "default/udptunnel" udptunnel
+        cd ..
         ;;
     debug)
         echo "Running debug builds..."
@@ -233,31 +305,137 @@ case $TARGET in
         fi
         ;;
     release)
-        echo "Building release packages for all architectures..."
+        echo "Building release packages for all architectures (both static and dynamic)..."
         ARCHITECTURES="amd64 arm64 armhf"
+        
+        # Extract version from Makefile
+        VERSION=$(grep '^VERSION := ' ../build/Makefile | sed 's/VERSION := //')
+        echo "Building version: $VERSION"
         
         "$SCRIPT_DIR/$(basename "$0")" clean
 
+        # Build both static and dynamic versions for each architecture
         for arch in $ARCHITECTURES; do
             echo ""
             echo "========================================="
-            echo "Building for architecture: $arch"
+            echo "Building dynamic binaries for architecture: $arch"
             echo "========================================="
+            env -u CC UDPTUNNEL_ARCH=$arch UDPTUNNEL_STATIC=0 "$SCRIPT_DIR/$(basename "$0")" build
             
-            # Recursively call this script with architecture set  
-            # Clear CC to force auto-detection for each architecture
-            env -u CC UDPTUNNEL_ARCH=$arch "$SCRIPT_DIR/$(basename "$0")" build
+            echo ""
+            echo "========================================="
+            echo "Building static binaries for architecture: $arch"
+            echo "========================================="
+            env -u CC UDPTUNNEL_ARCH=$arch UDPTUNNEL_STATIC=1 "$SCRIPT_DIR/$(basename "$0")" build
         done
+        
+        # Create default symlink to dynamic build for system architecture
+        HOST_ARCH=$(uname -m)
+        case $HOST_ARCH in
+            x86_64) DEFAULT_ARCH="amd64" ;;
+            aarch64) DEFAULT_ARCH="arm64" ;;
+            armv7l) DEFAULT_ARCH="armhf" ;;
+            *) DEFAULT_ARCH="amd64" ;;
+        esac
+        
+        cd output
+        rm -f default udptunnel
+        ln -sf "dynamic/$DEFAULT_ARCH" default
+        ln -sf "default/udptunnel" udptunnel
+        cd ..
+        
+        # Package release artifacts
+        echo ""
+        echo "========================================="
+        echo "Packaging release artifacts..."
+        echo "========================================="
+        
+        # Create release directory
+        rm -rf output/release
+        mkdir -p output/release
+        
+        # Copy all binaries and packages to release directory with proper naming
+        for build_type in static dynamic; do
+            for arch in $ARCHITECTURES; do
+                if [ -d "output/$build_type/$arch" ]; then
+                    # Copy binary
+                    if [ -f "output/$build_type/$arch/udptunnel-$VERSION-$arch" ]; then
+                        if [ "$build_type" = "static" ]; then
+                            cp "output/$build_type/$arch/udptunnel-$VERSION-$arch" "output/release/udptunnel-static-$VERSION-$arch"
+                        else
+                            cp "output/$build_type/$arch/udptunnel-$VERSION-$arch" "output/release/udptunnel-$VERSION-$arch"
+                        fi
+                        echo "  Copied $build_type binary for $arch"
+                    fi
+                    
+                    # Copy packages (DEB and RPM)
+                    for pkg in output/$build_type/$arch/*.deb output/$build_type/$arch/*.rpm; do
+                        if [ -f "$pkg" ]; then
+                            pkg_basename=$(basename "$pkg")
+                            if [ "$build_type" = "static" ]; then
+                                # Insert "static" into package name: udptunnel-1.2.2.amd64.deb -> udptunnel-static-1.2.2.amd64.deb
+                                new_pkg_name=$(echo "$pkg_basename" | sed "s/udptunnel-/udptunnel-static-/")
+                            else
+                                new_pkg_name="$pkg_basename"
+                            fi
+                            cp "$pkg" "output/release/$new_pkg_name"
+                            echo "  Copied $build_type package: $new_pkg_name"
+                        fi
+                    done
+                fi
+            done
+        done
+        
+        # Create source code archives using git
+        echo ""
+        echo "Creating source code archives..."
+        
+        # Check if git is available
+        if ! command -v git &> /dev/null; then
+            echo "Error: git command not found. Git is required for creating source archives."
+            exit 1
+        fi
+        
+        # Use /opt/src if available (Docker environment), otherwise current directory
+        if [ -d "/opt/src/.git" ]; then
+            SRC_DIR="/opt/src"
+            echo "  Using source directory: $SRC_DIR"
+        else
+            SRC_DIR="$(pwd)/../"
+            echo "  Using source directory: $SRC_DIR"
+            # Check if we're in a git repository
+            if ! (cd "$SRC_DIR" && git rev-parse --git-dir > /dev/null 2>&1); then
+                echo "Error: Not in a git repository. Source archives require git repository."
+                exit 1
+            fi
+        fi
+        
+        # Use git archive to create clean source exports
+        echo "  Creating zip archive..."
+        (cd "$SRC_DIR" && git archive --format=zip --prefix="udptunnel-$VERSION/" HEAD) > "output/release/udptunnel-$VERSION-source.zip"
+        
+        echo "  Creating tar.gz archive..."
+        (cd "$SRC_DIR" && git archive --format=tar.gz --prefix="udptunnel-$VERSION/" HEAD) > "output/release/udptunnel-$VERSION-source.tar.gz"
+        
+        echo "  Source archives created successfully"
         
         echo ""
         echo "========================================="
         echo "Release build completed!"
         echo "========================================="
-        echo "All packages created in architecture-specific directories:"
-        for arch in $ARCHITECTURES; do
-            echo "  $arch: $SCRIPT_DIR/../build/output/$arch/"
-            ls -la output/$arch/*.{deb,rpm} 2>/dev/null || echo "    No packages found for $arch"
+        echo "Release artifacts available in: output/release/"
+        ls -la output/release/ 2>/dev/null || echo "  No release artifacts found"
+        echo ""
+        echo "Architecture-specific builds also available in:"
+        for build_type in static dynamic; do
+            for arch in $ARCHITECTURES; do
+                if [ -d "output/$build_type/$arch" ]; then
+                    echo "  $build_type/$arch: output/$build_type/$arch/"
+                fi
+            done
         done
+        echo ""
+        echo "Default symlink points to: output/default -> $(readlink output/default 2>/dev/null || echo 'not created')"
         ;;
     *)
         echo "Usage: $0 [build|clean|all|debug|install|release]"
@@ -282,5 +460,5 @@ esac
 
 if [ "$TARGET" != "clean" ] && [ -f "./output/udptunnel" ]; then
     echo "Build completed successfully!"
-    echo "Binary: $SCRIPT_DIR/../build/output/udptunnel"
+    echo "Binary: $SCRIPT_DIR/../build/output/udptunnel (symlink to versioned binary)"
 fi

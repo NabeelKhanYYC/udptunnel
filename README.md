@@ -30,10 +30,11 @@ Available targets:
 - `clean` - Clean only
 - `all` - Clean then build
 - `debug` - Build with debug flags
+- `release` - Build both static and dynamic binaries for all architectures
 
 ### Build Output
 
-Objects go to `build/output/{arch}/objs/` and the final binary is in `build/output/{arch}/udptunnel`. Package files (DEB/RPM) are automatically created in `build/output/{arch}/` during the build process, where `{arch}` is the target architecture (amd64, arm64, armhf).
+Objects go to `build/output/objs/{arch}/` and the final versioned binary is in `build/output/{type}/{arch}/udptunnel-{version}-{arch}` with a symlink `udptunnel` for convenience. Package files (DEB/RPM) are automatically created in `build/output/{type}/{arch}/` during the build process, where `{type}` is either `static` or `dynamic` and `{arch}` is the target architecture (amd64, arm64, armhf). A `default` symlink in `build/output/` points to the dynamic build for your system architecture, and a global `udptunnel` symlink provides easy access to the default binary.
 
 ### Using the Binary Outside Docker
 
@@ -46,12 +47,18 @@ The Docker build process automatically makes the `udptunnel` binary available on
 
 2. **Use the binary directly from the host**:
    ```bash
-   # Binaries are in architecture-specific directories: ./build/output/{arch}/udptunnel
-   # For local builds, use your system architecture (typically amd64)
-   ./build/output/amd64/udptunnel --help
+   # Use the global udptunnel symlink (points to default build)
+   ./build/output/udptunnel --help
+   
+   # Or use the default directory symlink
+   ./build/output/default/udptunnel --help
+   
+   # Or access specific versioned builds: ./build/output/{type}/{arch}/udptunnel-{version}-{arch}
+   ./build/output/dynamic/amd64/udptunnel-1.2.2-amd64 --help
+   ./build/output/static/amd64/udptunnel-1.2.2-amd64 --help
    
    # Copy to system path if needed
-   sudo cp ./build/output/amd64/udptunnel /usr/local/bin/
+   sudo cp ./build/output/udptunnel /usr/local/bin/
    ```
 
 The volume binding in docker-compose.yml maps `./build:/opt/build/build:rw`, so build artifacts (including DEB/RPM packages) are automatically available on the host without needing to extract them from containers.
@@ -65,11 +72,14 @@ The build process automatically creates DEB and RPM packages for easy system ins
 After building, you can install UDP Tunnel system-wide using the generated packages:
 
 ```bash
-# For Debian/Ubuntu systems
-sudo dpkg -i ./build/output/amd64/udptunnel-1.2.2.amd64.deb
+# For Debian/Ubuntu systems (using default dynamic build)
+sudo dpkg -i ./build/output/default/udptunnel-1.2.2.amd64.deb
 
-# For RedHat/CentOS/Fedora systems  
-sudo rpm -i ./build/output/amd64/udptunnel-1.2.2.amd64.rpm
+# For RedHat/CentOS/Fedora systems (using default dynamic build)
+sudo rpm -i ./build/output/default/udptunnel-1.2.2.amd64.rpm
+
+# Or install specific static builds for deployment
+sudo dpkg -i ./build/output/static/amd64/udptunnel-1.2.2.amd64.deb
 ```
 
 ### Package Features
@@ -152,6 +162,15 @@ The build script automatically:
 
 Requirements: C compiler (gcc/clang), cmake, make, pkg-config (optional), libsystemd-dev (optional)
 
+**Note on Static Binaries:** Static builds use a minimal stub library for Linux capabilities (libcap) functions to enable static linking without requiring static versions of all systemd dependencies. This only affects statically-linked binaries - dynamic builds use the full systemd and libcap libraries normally. Static binaries retain core UDP tunneling and systemd socket activation functionality, but some advanced systemd privilege management features are disabled. If you encounter issues with static binaries:
+1. **First, try dynamic binaries** to confirm if the issue is present with full library support
+2. If the issue only occurs with static binaries and you specifically need static linking support, create an issue and include:
+   - The exact command you ran
+   - Complete build output with any error messages
+   - Runtime error messages or unexpected behavior
+   - Your deployment environment (Docker, systemd version, etc.)
+   - Confirmation that dynamic binaries work correctly
+
 ### Multi-Architecture Support
 
 UDP Tunnel supports building for multiple architectures. The build system automatically detects your system architecture, but you can override this with the `UDPTUNNEL_ARCH` environment variable.
@@ -163,17 +182,26 @@ UDP Tunnel supports building for multiple architectures. The build system automa
 
 **Usage examples:**
 ```bash
-# Auto-detect architecture (default behavior)
+# Auto-detect architecture (default behavior - creates dynamic binaries)
 ./bin/build.sh build
+
+# Create static binaries
+UDPTUNNEL_STATIC=1 ./bin/build.sh build
 
 # Override architecture for cross-compilation
 UDPTUNNEL_ARCH=arm64 ./bin/build.sh build
 
-# Build with cross-compiler
-UDPTUNNEL_ARCH=armhf CC=arm-linux-gnueabihf-gcc ./bin/build.sh build
+# Build static ARM64 binary with cross-compiler
+UDPTUNNEL_ARCH=arm64 UDPTUNNEL_STATIC=1 CC=aarch64-linux-gnu-gcc ./bin/build.sh build
 
-# Docker build for specific architecture
+# Build ARM hard float with specific FPU
+UDPTUNNEL_ARCH=armhf UDPTUNNEL_ARM_FPU=vfpv3-d16 ./bin/build.sh build
+
+# Docker build for specific architecture (dynamic)
 UDPTUNNEL_ARCH=arm64 docker-compose --profile build up build
+
+# Docker build for static binary
+UDPTUNNEL_STATIC=1 docker-compose --profile build up build
 ```
 
 ### Cross-Compilation Detection
@@ -205,6 +233,11 @@ The generated packages and binaries will be named according to the target archit
 
 UDP Tunnel can be configured through environment variables when using Docker containers. For detailed configuration options, see the `.env.example` file which contains comprehensive documentation for all available environment variables.
 
+**Key Build Configuration Variables:**
+- `UDPTUNNEL_ARCH`: Target architecture (amd64, arm64, armhf)
+- `UDPTUNNEL_STATIC`: Enable static linking (0/1)
+- `UDPTUNNEL_ARM_FPU`: ARM FPU type for armhf builds (neon, vfpv3, vfpv3-d16, vfpv4, vfpv4-d16)
+
 Copy `.env.example` to `.env` and modify the values according to your needs when using `docker-compose`.
 
 ## Usage Examples
@@ -217,32 +250,32 @@ Direct command line usage with the built or installed udptunnel binary.
 Accept TCP connections and relay to UDP service:
 ```bash
 # Basic server: listen on TCP port 8080, relay to UDP port 9090 on target-host
-./build/output/amd64/udptunnel -s 0.0.0.0:8080 target-host:9090
+./build/output/udptunnel -s 0.0.0.0:8080 target-host:9090
 
 # With timeout and verbose logging
-./build/output/amd64/udptunnel -s 0.0.0.0:8080 target-host:9090 -t 300 -v
+./build/output/udptunnel -s 0.0.0.0:8080 target-host:9090 -t 300 -v
 
 # Minimal configuration (listen on all interfaces)
-./build/output/amd64/udptunnel -s :8080 backend:5000
+./build/output/udptunnel -s :8080 backend:5000
 ```
 
 #### UDP-to-TCP Client Mode
 Accept UDP packets and encapsulate in TCP connections:
 ```bash
 # Basic client: listen on UDP port 9090, relay via TCP to port 8080 on tcp-server
-./build/output/amd64/udptunnel -c 0.0.0.0:9090 tcp-server:8080
+./build/output/udptunnel -c 0.0.0.0:9090 tcp-server:8080
 
 # With debug verbosity (multiple -v flags increase verbosity)
-./build/output/amd64/udptunnel -c 0.0.0.0:9090 tcp-server:8080 -v -v -v
+./build/output/udptunnel -c 0.0.0.0:9090 tcp-server:8080 -v -v -v
 
 # With timeout settings
-./build/output/amd64/udptunnel -c :7000 debug-server:7001 -t 600 -v
+./build/output/udptunnel -c :7000 debug-server:7001 -t 600 -v
 ```
 
 #### Command Line Options
 ```bash
 # Get help and see all available options
-./build/output/amd64/udptunnel --help
+./build/output/udptunnel --help
 
 # Common patterns:
 # -s <local:port> <remote:port>  # Server mode

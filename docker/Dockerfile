@@ -9,10 +9,16 @@ RUN install -m 0755 -d /etc/apt/keyrings
 # Common target for building
 FROM base AS build
 
+# Install Git
+RUN apt-get install -y git
+
 # Install Build Essentials
 RUN apt-get install -y build-essential
 RUN apt-get install -y pkg-config
-RUN apt-get install -y libsystemd-dev
+RUN apt-get install -y libsystemd-dev            # AMD64 systemd library (for static linking)
+RUN apt-get install -y libcap-dev                # AMD64 capabilities library (includes static library for linking)
+RUN apt-get install -y libcap2-bin               # AMD64 capabilities utilities  
+RUN apt-get install -y libc6-dev                 # AMD64 C library development files (for static linking)
 RUN apt-get install -y cmake
 RUN apt-get install -y rpm
 
@@ -25,9 +31,9 @@ RUN apt-get install -y crossbuild-essential-armhf # ARM v7 cross-build essential
 # Enable multi-arch and install cross-compiled systemd libraries
 RUN dpkg --add-architecture arm64
 RUN dpkg --add-architecture armhf
-RUN dpkg --print-foreign-architectures  # Debug: verify architectures were added
 # Create new sources.list with architecture restrictions
-RUN mv /etc/apt/sources.list /etc/apt/sources.list.bak
+RUN mv    /etc/apt/sources.list /etc/apt/sources.list.bak
+RUN mv    /etc/apt/sources.list.d/ubuntu.sources /etc/apt/sources.list.d/ubuntu.sources.bak
 RUN rm -f /etc/apt/sources.list.d/ubuntu.sources
 RUN echo "# AMD64 packages from main Ubuntu archive" > /etc/apt/sources.list
 RUN echo "deb [arch=amd64] http://archive.ubuntu.com/ubuntu/ noble main restricted universe multiverse" >> /etc/apt/sources.list
@@ -40,15 +46,14 @@ RUN echo "deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports/ noble mai
 RUN echo "deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports/ noble-updates main universe" >> /etc/apt/sources.list
 RUN echo "deb [arch=arm64,armhf] http://ports.ubuntu.com/ubuntu-ports/ noble-security main universe" >> /etc/apt/sources.list
 RUN apt-get update
-RUN apt-cache search libsystemd-dev              # Debug: check if packages are available
 RUN apt-get install -y libsystemd-dev:arm64      # ARM64 systemd library
 RUN apt-get install -y libsystemd-dev:armhf      # ARM v7 systemd library
 RUN apt-get install -y libcap-dev:arm64          # ARM64 capabilities library (systemd dependency)
 RUN apt-get install -y libcap-dev:armhf          # ARM v7 capabilities library (systemd dependency)
 RUN apt-get install -y libc6-dev:armhf           # ARM v7 C library development files
-RUN dpkg -l | grep libsystemd                    # Debug: show what systemd packages are installed
 # Restore original sources for future apt operations
 RUN mv /etc/apt/sources.list.bak /etc/apt/sources.list
+RUN mv /etc/apt/sources.list.d/ubuntu.sources.bak /etc/apt/sources.list.d/ubuntu.sources
 
 # Set working directory
 RUN mkdir -p /opt/build

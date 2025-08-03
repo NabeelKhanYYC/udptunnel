@@ -4,9 +4,6 @@ prefix = /usr/local
 MAKEFILE_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 PROJECT_ROOT := $(abspath $(MAKEFILE_DIR)/..)
 SRC_DIR := $(PROJECT_ROOT)/src
-BUILD_DIR := $(MAKEFILE_DIR)output/$(TARGET_ARCH)
-OBJ_DIR := $(BUILD_DIR)/objs
-
 # ==============================================================================
 # ARCHITECTURE DETECTION AND CROSS-COMPILATION
 # ==============================================================================
@@ -29,6 +26,26 @@ else
         TARGET_ARCH := $(UNAME_M)
     endif
 endif
+
+# Determine build type (static or dynamic)
+ifeq ($(UDPTUNNEL_STATIC),1)
+    BUILD_TYPE := static
+else ifeq ($(UDPTUNNEL_STATIC),true)
+    BUILD_TYPE := static
+else
+    BUILD_TYPE := dynamic
+endif
+
+# Project version - single source of truth
+VERSION := 1.2.2
+
+# Now set directories using the correctly determined architecture
+BUILD_DIR := $(MAKEFILE_DIR)output/$(BUILD_TYPE)/$(TARGET_ARCH)
+OBJ_DIR := $(MAKEFILE_DIR)output/objs/$(TARGET_ARCH)
+
+# Versioned binary name
+BINARY_NAME := udptunnel-$(VERSION)-$(TARGET_ARCH)
+SYMLINK_NAME := udptunnel
 
 # Detect host architecture for cross-compilation check
 UNAME_M := $(shell uname -m)
@@ -76,7 +93,9 @@ CFLAGS ?= -g -O2
 
 # Add architecture-specific flags if needed
 ifeq ($(TARGET_ARCH),armhf)
-    CFLAGS += -march=armv7-a
+    # Set ARM FPU from environment variable or default to neon
+    ARM_FPU ?= $(if $(UDPTUNNEL_ARM_FPU),$(UDPTUNNEL_ARM_FPU),neon)
+    CFLAGS += -march=armv7-a -mfpu=$(ARM_FPU) -mfloat-abi=hard
 else ifeq ($(TARGET_ARCH),arm64)
     CFLAGS += -march=armv8-a
 endif
@@ -85,10 +104,31 @@ endif
 INSTALL ?= install
 PKG_CONFIG ?= pkg-config
 
+# Conditional linking flags based on build type
+ifeq ($(BUILD_TYPE),static)
+    # Static linking flag and library paths
+    LDFLAGS += -static
+    # Add library search paths for static linking (including our stub library location)
+    LDFLAGS += -L$(OBJ_DIR)
+    ifeq ($(TARGET_ARCH),arm64)
+        LDFLAGS += -L/usr/lib/aarch64-linux-gnu
+    else ifeq ($(TARGET_ARCH),armhf)
+        LDFLAGS += -L/usr/lib/arm-linux-gnueabihf
+    else
+        LDFLAGS += -L/usr/lib/x86_64-linux-gnu
+    endif
+endif
+
 # Systemd integration (optional)
 ifeq ($(shell $(PKG_CONFIG) --exists libsystemd || echo NO),)
     DEFS += -DHAVE_SYSTEMD_SD_DAEMON_H $(shell $(PKG_CONFIG) --cflags libsystemd)
-    LDADD += $(shell $(PKG_CONFIG) --libs libsystemd)
+    ifeq ($(BUILD_TYPE),static)
+        LDADD += $(shell $(PKG_CONFIG) --libs --static libsystemd)
+        # Add libcap dependency - use stub library for static linking
+        LDADD += -lcap_stub
+    else
+        LDADD += $(shell $(PKG_CONFIG) --libs libsystemd)
+    endif
 endif
 
 # Preprocessor and include flags
@@ -102,18 +142,18 @@ OBJECTS := $(OBJ_DIR)/log.o $(OBJ_DIR)/network.o $(OBJ_DIR)/utils.o $(OBJ_DIR)/u
 
 .PHONY: all clean depend install
 
-all: $(OBJ_DIR) depend $(BUILD_DIR)/udptunnel
+all: $(OBJ_DIR) depend $(BUILD_DIR)/$(BINARY_NAME) $(BUILD_DIR)/$(SYMLINK_NAME)
 
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
 
 install:
 	$(INSTALL) -d $(BASEDIR)$(prefix)/sbin/
-	$(INSTALL) -m 0755 $(BUILD_DIR)/udptunnel $(BASEDIR)$(prefix)/sbin/
+	$(INSTALL) -m 0755 $(BUILD_DIR)/$(BINARY_NAME) $(BASEDIR)$(prefix)/sbin/udptunnel
 
 clean:
 	@echo "Cleaning build artifacts..."
-	-rm -f $(BUILD_DIR)/Makefile.depend $(BUILD_DIR)/udptunnel
+	-rm -f $(OBJ_DIR)/Makefile.depend $(BUILD_DIR)/$(BINARY_NAME) $(BUILD_DIR)/$(SYMLINK_NAME)
 	-rm -f $(OBJECTS)
 	-rm -rf $(OBJ_DIR)
 	@echo "Clean completed."
@@ -130,16 +170,19 @@ $(OBJ_DIR)/log.o: $(SRC_DIR)/libs/log/log.c
 $(OBJ_DIR)/network.o: $(SRC_DIR)/libs/network/network.c
 	$(CC) $(CPPFLAGS) $(CFLAGS) -c $< -o $@
 
-$(BUILD_DIR)/udptunnel: $(OBJECTS)
+$(BUILD_DIR)/$(BINARY_NAME): $(OBJECTS) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $^ $(LDADD) $(LIBS)
 
-depend: $(BUILD_DIR)/Makefile.depend
-$(BUILD_DIR)/Makefile.depend: | $(BUILD_DIR)
+$(BUILD_DIR)/$(SYMLINK_NAME): $(BUILD_DIR)/$(BINARY_NAME)
+	cd $(BUILD_DIR) && ln -sf $(BINARY_NAME) $(SYMLINK_NAME)
+
+depend: $(OBJ_DIR)/Makefile.depend
+$(OBJ_DIR)/Makefile.depend: | $(OBJ_DIR)
 	$(CC) $(CPPFLAGS) $(CFLAGS) -MM -MG $(SRC_DIR)/udptunnel.c $(SRC_DIR)/libs/*/*.c > $@
 
 $(BUILD_DIR):
 	mkdir -p $(BUILD_DIR)
 
 ifneq ($(MAKECMDGOALS),clean)
--include $(BUILD_DIR)/Makefile.depend
+-include $(OBJ_DIR)/Makefile.depend
 endif
